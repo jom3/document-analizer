@@ -10,7 +10,16 @@ export interface Document {
   extension: string;
   size: number;
   status: string;
+  pageCount: number | null;
+  title: string | null;
+  author: string | null;
+  errorMessage: string | null;
   createdAt: string;
+}
+
+export interface DocumentPage {
+  pageNumber: number;
+  text: string;
 }
 
 export interface DocumentList {
@@ -28,6 +37,10 @@ export class DocumentsService {
     return this.http.get<DocumentList>('/api/documents', { params: { page, limit } });
   }
 
+  getOne(id: string): Observable<Document> {
+    return this.http.get<Document>(`/api/documents/${id}`);
+  }
+
   upload(file: File, options: { name?: string; keepOriginalName: boolean }): Observable<Document> {
     const form = new FormData();
     form.append('file', file);
@@ -40,6 +53,10 @@ export class DocumentsService {
 
   download(document: Document): Observable<Blob> {
     return this.http.get(`/api/documents/${document.id}/download`, { responseType: 'blob' });
+  }
+
+  getPages(id: string): Observable<DocumentPage[]> {
+    return this.http.get<DocumentPage[]>(`/api/documents/${id}/pages`);
   }
 
   remove(id: string): Observable<{ message: string }> {

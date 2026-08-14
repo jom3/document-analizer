@@ -15,7 +15,7 @@ const LIMIT = 10;
       <div class="upload">
         <label>
           Archivo
-          <input #fileInput type="file" (change)="onFileChange($event)" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg" />
+          <input #fileInput type="file" (change)="onFileChange($event)" accept=".pdf,application/pdf" />
         </label>
 
         <label class="checkbox">
@@ -52,26 +52,39 @@ const LIMIT = 10;
           <tr>
             <th>Nombre</th>
             <th>Tamaño</th>
-            <th>Subido</th>
+            <th>Páginas</th>
             <th>Estado</th>
+            <th>Subido</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           @for (doc of documents(); track doc.id) {
             <tr>
-              <td>{{ doc.name }}</td>
+              <td>
+                {{ doc.name }}
+                @if (doc.title || doc.author) {
+                  <p class="meta">
+                    {{ doc.title ?? '—' }}{{ doc.author ? ' · ' + doc.author : '' }}
+                  </p>
+                }
+                @if (doc.status === 'FAILED' && doc.errorMessage) {
+                  <p class="error">{{ doc.errorMessage }}</p>
+                }
+              </td>
               <td>{{ formatSize(doc.size) }}</td>
+              <td>{{ doc.pageCount ?? '—' }}</td>
+              <td><span class="status" [class]="statusClass(doc.status)">{{ statusLabel(doc.status) }}</span></td>
               <td>{{ formatDate(doc.createdAt) }}</td>
-              <td>{{ doc.status }}</td>
               <td class="actions">
+                <a class="view" routerLink="/documents/{{ doc.id }}">Ver páginas</a>
                 <button (click)="download(doc)">Descargar</button>
                 <button class="danger" (click)="remove(doc)">Eliminar</button>
               </td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="empty">No hay documentos todavía</td>
+              <td colspan="6" class="empty">No hay documentos todavía</td>
             </tr>
           }
         </tbody>
@@ -168,6 +181,13 @@ const LIMIT = 10;
       display: flex;
       gap: 0.5rem;
       justify-content: flex-end;
+      align-items: center;
+    }
+
+    .documents .actions .view {
+      font-size: 0.875rem;
+      color: #1a73e8;
+      text-decoration: none;
     }
 
     .documents .empty {
@@ -190,6 +210,37 @@ const LIMIT = 10;
     .documents .error {
       color: #b00020;
       font-size: 0.875rem;
+    }
+
+    .documents .meta {
+      margin: 0.25rem 0 0;
+      font-size: 0.75rem;
+      color: #777;
+    }
+
+    .documents .status {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #e8eaed;
+      color: #444;
+    }
+
+    .documents .status.completed {
+      background: #e0f2e1;
+      color: #0b6e0b;
+    }
+
+    .documents .status.failed {
+      background: #fdecea;
+      color: #b00020;
+    }
+
+    .documents .status.processing {
+      background: #fff4e5;
+      color: #8a5300;
     }
 
     .documents .success {
@@ -325,5 +376,24 @@ export class DocumentsPage implements OnInit {
 
   formatDate(iso: string): string {
     return new Date(iso).toLocaleString();
+  }
+
+  statusLabel(status: string): string {
+    switch (status) {
+      case 'UPLOADED':
+        return 'Subido';
+      case 'PROCESSING':
+        return 'Procesando';
+      case 'COMPLETED':
+        return 'Completado';
+      case 'FAILED':
+        return 'Fallido';
+      default:
+        return status;
+    }
+  }
+
+  statusClass(status: string): string {
+    return status.toLowerCase();
   }
 }
