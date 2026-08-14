@@ -16,5 +16,10 @@ export const routes: Routes = [
   { path: 'forgot-password', component: ForgotPasswordPage },
   { path: 'reset-password', component: ResetPasswordPage },
   { path: 'dashboard', component: DashboardPage, canActivate: [authGuard] },
+  {
+    path: 'documents',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/documents/documents.page').then((m) => m.DocumentsPage),
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];
