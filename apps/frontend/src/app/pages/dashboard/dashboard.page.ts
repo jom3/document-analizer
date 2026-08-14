@@ -1,13 +1,15 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-dashboard-page',
+  imports: [RouterLink],
   template: `
     <section class="page">
       <h1>Dashboard</h1>
       <p>Bienvenido, {{ user()?.email }}</p>
+      <a routerLink="/documents">Mis documentos</a>
       <button (click)="logout()">Cerrar sesión</button>
     </section>
   `,
