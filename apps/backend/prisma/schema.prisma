@@ -23,4 +23,24 @@ model User {
   passwordResetTokenExpires     DateTime?
   createdAt                     DateTime  @default(now())
   updatedAt                     DateTime  @updatedAt
+  documents                     Document[]
+}
+
+enum DocumentStatus {
+  UPLOADED
+}
+
+model Document {
+  id           String         @id @default(uuid())
+  name         String
+  originalName String
+  mimeType     String
+  extension    String
+  size         Int
+  storageKey   String
+  status       DocumentStatus @default(UPLOADED)
+  ownerId      String
+  owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 }
