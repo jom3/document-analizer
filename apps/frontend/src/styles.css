@@ -1,1 +1,92 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f5f6f8;
+  color: #1a1a1a;
+}
+
+.auth-card {
+  max-width: 400px;
+  margin: 8vh auto;
+  padding: 2rem;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.auth-card h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.25rem;
+}
+
+.auth-card h2 {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.auth-card label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  margin-top: 0.25rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+.auth-card button {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 6px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.auth-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-card nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.auth-card .error {
+  color: #b00020;
+  font-size: 0.875rem;
+}
+
+.auth-card .info {
+  color: #0b6e0b;
+  font-size: 0.875rem;
+}
+
+.page {
+  max-width: 720px;
+  margin: 6vh auto;
+  padding: 0 1rem;
+}
+
+.page h1 {
+  margin: 0 0 0.5rem;
+}
