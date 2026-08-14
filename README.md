@@ -270,6 +270,45 @@ The main objective is to demonstrate **how AI can become part of a real software
 
 ---
 
+## Development Setup
+
+The application is not containerized (Dockerization is a future feature/spec). Only PostgreSQL runs in a **standalone container**, independent of the project, so you can start and stop it without affecting the code.
+
+### Local database (PostgreSQL container)
+
+Start a persistent PostgreSQL container on port `5433` (host) → `5432` (container):
+
+```bash
+docker compose up -d
+```
+
+This creates the `db` service defined in `docker-compose.yml` (root): image `postgres:18.4-alpine3.24`, credentials `postgres`/`postgres`/`document_analyzer`, port `5433`, and a named volume (`document-analyzer-db-data`) so data survives container restarts.
+
+Stop it with `docker compose down` (use `docker compose down -v` only if you also want to delete the data).
+
+Equivalent one-liner without Compose:
+
+```bash
+docker run -d \
+  --name document-analyzer-db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=document_analyzer \
+  -p 5433:5432 \
+  -v document-analyzer-db-data:/var/lib/postgresql \
+  postgres:18.4-alpine3.24
+```
+
+Note: Postgres 18 stores data in version-specific subdirectories, so the volume must be mounted at `/var/lib/postgresql` (not `/var/lib/postgresql/data`).
+
+The backend connects to it through `DATABASE_URL` (see `apps/backend/.env.example`):
+
+```text
+DATABASE_URL="postgresql://postgres:postgres@localhost:5433/document_analyzer?schema=public"
+```
+
+---
+
 ## Project Status
 
 The project is being developed incrementally using a **Spec-Driven Development** approach.

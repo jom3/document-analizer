@@ -1,6 +1,6 @@
 # SPEC 01 — Bootstrap del proyecto (arranque inicial)
 
-> **Status:** Borrador
+> **Status:** Implementado
 > **Depends on:** —
 > **Date:** 2026-08-13
 > **Objective:** Arrancar el proyecto como un monorepo npm workspaces con frontend Angular y backend NestJS conectado a PostgreSQL vía Prisma, sin dockerizar la aplicación.
@@ -16,7 +16,7 @@
 - `GET /health` en el backend que verifica conectividad con PostgreSQL vía Prisma.
 - Landing mínima en el frontend que consume `/health` a través de un proxy de desarrollo.
 - Prisma configurado solo como conexión (`datasource` + `generator`), sin modelos ni migraciones.
-- Contenedor standalone de PostgreSQL (`postgres:18.4-alpine3.24`) documentado con un comando `docker run`, en puerto `5433`, con volumen persistente.
+- Contenedor standalone de PostgreSQL (`postgres:18.4-alpine3.24`) definido en un `docker-compose.yml` en la raíz, en puerto `5433`, con volumen persistente, para que cualquier persona pueda levantar la base con `docker compose up -d`.
 - Fijar versión de Node (`engines` + `.nvmrc`) en Node 24.
 - Variables de entorno con `.env.example` versionado y `.env` ignorado.
 
@@ -48,21 +48,22 @@ El esquema Prisma (`apps/backend/prisma/schema.prisma`) contiene únicamente `ge
 5. Agregar módulo de health en el backend: `HealthController` con `GET /health` que responde `{ status: 'ok' }`. Verificación: levantar backend y hacer `GET localhost:3000/health`.
 6. Configurar Prisma en `apps/backend`: instalar `prisma` y `@prisma/client`, crear `schema.prisma` (sin modelos), `.env` y `.env.example`. Verificación: `npx prisma generate` termina sin errores.
 7. Extender `/health` para verificar la base: ejecutar `SELECT 1` vía Prisma `$queryRaw` y responder `db: 'up'` o `db: 'down'`. Verificación: con el contenedor corriendo responde `up`.
-8. Documentar el contenedor standalone de Postgres en README con el comando `docker run` (imagen `postgres:18.4-alpine3.24`, puerto `5433:5432`, volumen nombrado). Verificación: ejecutar el comando y confirmar que el contenedor queda activo.
+8. Crear `docker-compose.yml` en la raíz que defina el servicio `db` con la imagen `postgres:18.4-alpine3.24`, puerto `5433:5432`, volumen nombrado `document-analyzer-db-data` y credenciales `postgres`/`postgres`/`document_analyzer`. Verificación: `docker compose up -d` levanta el contenedor `document-analyzer-db` activo en el puerto 5433.
 9. Crear la landing del frontend que llama a `/health` a través de un proxy de desarrollo de Angular (`/api` → backend) y muestra el estado. Verificación: abrir el frontend y ver el estado del backend y de la base.
+10. Documentar en README la sección "Development Setup" con las instrucciones para levantar la base (`docker compose up -d`), credenciales y `DATABASE_URL`. Verificación: una persona nueva puede levantar la base siguiendo el README.
 
 ## Acceptance criteria
 
-- [ ] `git init` ejecutado y `.gitignore` ignora `node_modules`, `dist` y `.env`.
-- [ ] `npm install` en la raíz instala las dependencias de ambos workspaces sin errores.
-- [ ] `npm run build` compila frontend y backend sin errores.
-- [ ] `npm run dev` levanta frontend (puerto 4200) y backend (puerto 3000).
-- [ ] `GET http://localhost:3000/health` responde 200 con `{ status: 'ok', db: 'up' }` con el contenedor activo.
-- [ ] La landing del frontend carga y muestra el estado consumido desde `/health` vía proxy.
-- [ ] El contenedor `document-analyzer-db` usa la imagen `postgres:18.4-alpine3.24`, expone `5433` y tiene volumen persistente.
-- [ ] `apps/backend/.env.example` está versionado y `apps/backend/.env` está en `.gitignore`.
-- [ ] `.nvmrc` y `engines.node` fijan Node 24.
-- [ ] No existe Dockerfile ni docker-compose para la aplicación en el repo.
+- [x] `git init` ejecutado y `.gitignore` ignora `node_modules`, `dist` y `.env`.
+- [x] `npm install` en la raíz instala las dependencias de ambos workspaces sin errores.
+- [x] `npm run build` compila frontend y backend sin errores.
+- [x] `npm run dev` levanta frontend (puerto 4200) y backend (puerto 3000).
+- [x] `GET http://localhost:3000/health` responde 200 con `{ status: 'ok', db: 'up' }` con el contenedor activo.
+- [x] La landing del frontend carga y muestra el estado consumido desde `/health` vía proxy.
+- [x] El contenedor `document-analyzer-db` usa la imagen `postgres:18.4-alpine3.24`, expone `5433` y tiene volumen persistente.
+- [x] `docker compose up -d` levanta la base desde el `docker-compose.yml` de la raíz sin comandos adicionales.- [x] `apps/backend/.env.example` está versionado y `apps/backend/.env` está en `.gitignore`.
+- [x] `.nvmrc` y `engines.node` fijan Node 24.
+- [x] No existe Dockerfile ni docker-compose para la aplicación en el repo.
 
 ## Decisions
 
@@ -70,6 +71,8 @@ El esquema Prisma (`apps/backend/prisma/schema.prisma`) contiene únicamente `ge
 - **No:** Nx. Complejidad innecesaria para este arranque.
 - **Sí:** npm como gestor de paquetes.
 - **Sí:** Docker solo para un contenedor standalone de PostgreSQL, independiente del proyecto. Permite una base local permanente sin instalar Postgres nativo.
+- **Sí:** definir la base en un `docker-compose.yml` en la raíz (solo el servicio `db`). Cualquier persona clona el repo, ejecuta `docker compose up -d` y tiene la base lista, sin depender de un comando `docker run` manual.
+- **No:** dockerizar la aplicación en ese compose. Frontend y backend siguen corriendo con `npm run dev`; la dockerización de la app va en un spec aparte.
 - **No:** Dockerizar la aplicación. La dockerización de frontend/backend va en un spec aparte.
 - **Sí:** Prisma solo como conexión (sin modelos ni migraciones). Los modelos llegan con la funcionalidad en specs futuros.
 - **Sí:** credenciales de desarrollo `postgres` / `postgres` / `document_analyzer` y puerto `5433`.
