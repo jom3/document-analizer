@@ -5,10 +5,16 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { access, mkdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
+import { DocumentStatus } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ALLOWED_MIME_TYPES, MAX_NAME_LENGTH } from './document.constants.js';
+import { DocumentProcessingService } from './document-processing.service.js';
+import {
+  ALLOWED_MIME_TYPES,
+  MAX_NAME_LENGTH,
+  PDF_MAGIC_NUMBER,
+} from './document.constants.js';
 
 interface CreateDocumentInput {
   file?: Express.Multer.File;
@@ -18,7 +24,10 @@ interface CreateDocumentInput {
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly processing: DocumentProcessingService,
+  ) {}
 
   async create(ownerId: string, input: CreateDocumentInput) {
     const { file, name, keepOriginalName } = input;
@@ -46,8 +55,13 @@ export class DocumentsService {
       throw new BadRequestException('No se pudo guardar el archivo');
     }
 
+    if (!(await this.hasValidMagicNumber(fullPath))) {
+      await unlink(fullPath).catch(() => undefined);
+      throw new BadRequestException('Tipo de archivo no permitido');
+    }
+
     try {
-      return await this.prisma.document.create({
+      const document = await this.prisma.document.create({
         data: {
           name: documentName,
           originalName: file.originalname,
@@ -58,9 +72,29 @@ export class DocumentsService {
           ownerId,
         },
       });
+      await this.process(document);
+      return this.prisma.document.findUniqueOrThrow({
+        where: { id: document.id },
+      });
     } catch (error) {
       await unlink(fullPath).catch(() => undefined);
       throw error;
+    }
+  }
+
+  private async process(document: { id: string }): Promise<void> {
+    try {
+      await this.processing.processDocument(document.id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Error desconocido';
+      await this.prisma.document.update({
+        where: { id: document.id },
+        data: {
+          status: DocumentStatus.FAILED,
+          errorMessage: message,
+        },
+      });
     }
   }
 
@@ -99,6 +133,15 @@ export class DocumentsService {
     return { document, stream: createReadStream(filePath) };
   }
 
+  async getPages(ownerId: string, id: string) {
+    await this.findOne(ownerId, id);
+    return this.prisma.documentPage.findMany({
+      where: { documentId: id },
+      orderBy: { pageNumber: 'asc' },
+      select: { pageNumber: true, text: true },
+    });
+  }
+
   async remove(ownerId: string, id: string) {
     const document = await this.findOne(ownerId, id);
     await this.prisma.document.delete({ where: { id: document.id } });
@@ -111,10 +154,27 @@ export class DocumentsService {
     return resolve(process.env.STORAGE_PATH ?? './storage');
   }
 
+  private async hasValidMagicNumber(filePath: string): Promise<boolean> {
+    const handle = await open(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(PDF_MAGIC_NUMBER.length);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      return (
+        bytesRead === PDF_MAGIC_NUMBER.length &&
+        buffer.toString('ascii') === PDF_MAGIC_NUMBER
+      );
+    } finally {
+      await handle.close();
+    }
+  }
+
   private resolveExtension(originalName: string, mimetype: string): string {
+    const allowedExtension = ALLOWED_MIME_TYPES[mimetype];
+    if (!allowedExtension) {
+      throw new BadRequestException('Tipo de archivo no permitido');
+    }
     const extension = extname(originalName).slice(1).toLowerCase();
-    const allowedMime = ALLOWED_MIME_TYPES[extension];
-    if (!allowedMime || allowedMime !== mimetype) {
+    if (extension !== allowedExtension.slice(1)) {
       throw new BadRequestException('Tipo de archivo no permitido');
     }
     return extension;

@@ -28,6 +28,9 @@ model User {
 
 enum DocumentStatus {
   UPLOADED
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 model Document {
@@ -39,8 +42,24 @@ model Document {
   size         Int
   storageKey   String
   status       DocumentStatus @default(UPLOADED)
+  pageCount    Int?
+  title        String?
+  author       String?
+  errorMessage String?
   ownerId      String
   owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pages        DocumentPage[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+}
+
+model DocumentPage {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  pageNumber Int
+  text       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, pageNumber])
 }

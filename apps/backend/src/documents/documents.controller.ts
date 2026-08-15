@@ -85,6 +85,11 @@ export class DocumentsController {
     return new StreamableFile(stream);
   }
 
+  @Get(':id/pages')
+  async pages(@Req() req: Request, @Param('id') id: string) {
+    return this.documents.getPages(this.ownerId(req), id);
+  }
+
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') id: string) {
     await this.documents.remove(this.ownerId(req), id);
