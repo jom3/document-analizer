@@ -33,6 +33,11 @@ enum DocumentStatus {
   FAILED
 }
 
+enum AnalysisStatus {
+  COMPLETED
+  FAILED
+}
+
 model Document {
   id           String         @id @default(uuid())
   name         String
@@ -49,6 +54,7 @@ model Document {
   ownerId      String
   owner        User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   pages        DocumentPage[]
+  analysis     DocumentAnalysis?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }
@@ -62,4 +68,23 @@ model DocumentPage {
   createdAt  DateTime @default(now())
 
   @@unique([documentId, pageNumber])
+}
+
+model DocumentAnalysis {
+  id               String         @id @default(uuid())
+  documentId       String         @unique
+  document         Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  status           AnalysisStatus @default(COMPLETED)
+  documentType     String?
+  summary          String?
+  keyInfo          Json?
+  confidence       Int?
+  model            String
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+  truncated        Boolean        @default(false)
+  errorMessage     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
