@@ -40,8 +40,8 @@ export class DocumentProcessingService {
       info: {},
     }));
     const metadata = info as Record<string, unknown>;
-    const title = typeof metadata.Title === 'string' ? metadata.Title : null;
-    const author = typeof metadata.Author === 'string' ? metadata.Author : null;
+    const title = this.sanitize(metadata.Title);
+    const author = this.sanitize(metadata.Author);
 
     const pageTexts: string[] = [];
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
@@ -50,6 +50,7 @@ export class DocumentProcessingService {
       const text = content.items
         .map((item) => ('str' in item ? item.str : ''))
         .join(' ')
+        .replace(/\u0000/g, '')
         .replace(/\s+/g, ' ')
         .trim();
       pageTexts.push(text);
@@ -74,6 +75,11 @@ export class DocumentProcessingService {
         })),
       }),
     ]);
+  }
+
+  private sanitize(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    return value.replace(/\u0000/g, '').trim() || null;
   }
 
   private get storagePath(): string {
