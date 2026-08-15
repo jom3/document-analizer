@@ -51,10 +51,25 @@ import {
           @if (keyEntries(analysis()!).length > 0) {
             <table class="key-info">
               @for (entry of keyEntries(analysis()!); track entry[0]) {
-                <tr>
-                  <td>{{ keyLabel(entry[0]) }}</td>
-                  <td>{{ entry[1] }}</td>
-                </tr>
+                @if (isObjectList(entry[1])) {
+                  <tr>
+                    <td>{{ keyLabel(entry[0]) }}</td>
+                    <td>
+                      @for (item of objectList(entry[1]); track $index) {
+                        <div class="key-item">
+                          @for (sub of itemEntries(item); track sub[0]) {
+                            <span class="key-sub"><strong>{{ keyLabel(sub[0]) }}:</strong> {{ sub[1] }}</span>
+                          }
+                        </div>
+                      }
+                    </td>
+                  </tr>
+                } @else {
+                  <tr>
+                    <td>{{ keyLabel(entry[0]) }}</td>
+                    <td>{{ formatScalar(entry[1]) }}</td>
+                  </tr>
+                }
               }
             </table>
           }
@@ -174,6 +189,19 @@ import {
       font-weight: 600;
     }
 
+    .detail .key-item {
+      padding: 0.25rem 0;
+    }
+
+    .detail .key-item + .key-item {
+      border-top: 1px solid #eee;
+    }
+
+    .detail .key-sub {
+      display: block;
+      font-size: 0.8125rem;
+    }
+
     .detail .page-block {
       background: #fff;
       border: 1px solid #ddd;
@@ -257,25 +285,52 @@ export class DocumentDetailPage implements OnInit {
     );
   }
 
+  isObjectList(value: unknown): boolean {
+    return Array.isArray(value) && value.length > 0 && typeof value[0] === 'object';
+  }
+
+  objectList(value: unknown): object[] {
+    return Array.isArray(value) ? (value as object[]) : [];
+  }
+
+  itemEntries(item: unknown): [string, unknown][] {
+    return Object.entries(item as Record<string, unknown>).filter(
+      ([, value]) => value !== null && value !== '',
+    );
+  }
+
+  formatScalar(value: unknown): string {
+    if (Array.isArray(value)) {
+      return (value as unknown[]).map(String).join(', ');
+    }
+    return String(value);
+  }
+
   keyLabel(key: string): string {
     const labels: Record<string, string> = {
+      invoiceNumber: 'Nº factura',
+      date: 'Fecha',
       supplier: 'Proveedor',
       customer: 'Cliente',
-      invoiceNumber: 'Nº factura',
-      issueDate: 'Fecha emisión',
-      dueDate: 'Fecha vencimiento',
+      subtotal: 'Subtotal',
+      tax: 'Impuestos',
       total: 'Total',
       currency: 'Moneda',
       fullName: 'Nombre',
-      headline: 'Título profesional',
-      skills: 'Habilidades',
-      totalYearsExperience: 'Años de experiencia',
       email: 'Email',
-      phone: 'Teléfono',
+      skills: 'Habilidades',
+      experience: 'Experiencia',
+      education: 'Educación',
+      company: 'Empresa',
+      role: 'Rol',
+      institution: 'Institución',
+      degree: 'Título',
+      year: 'Año',
       parties: 'Partes',
       startDate: 'Fecha inicio',
       endDate: 'Fecha fin',
-      value: 'Valor',
+      paymentTerms: 'Términos de pago',
+      terminationConditions: 'Condiciones de terminación',
     };
     return labels[key] ?? key;
   }
