@@ -22,6 +22,22 @@ export interface DocumentPage {
   text: string;
 }
 
+export interface DocumentAnalysis {
+  id: string;
+  status: string;
+  documentType: string | null;
+  summary: string | null;
+  keyInfo: Record<string, unknown> | null;
+  confidence: number | null;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  truncated: boolean;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 export interface DocumentList {
   data: Document[];
   total: number;
@@ -57,6 +73,10 @@ export class DocumentsService {
 
   getPages(id: string): Observable<DocumentPage[]> {
     return this.http.get<DocumentPage[]>(`/api/documents/${id}/pages`);
+  }
+
+  getAnalysis(id: string): Observable<DocumentAnalysis> {
+    return this.http.get<DocumentAnalysis>(`/api/documents/${id}/analysis`);
   }
 
   remove(id: string): Observable<{ message: string }> {

@@ -90,6 +90,11 @@ export class DocumentsController {
     return this.documents.getPages(this.ownerId(req), id);
   }
 
+  @Get(':id/analysis')
+  async analysis(@Req() req: Request, @Param('id') id: string) {
+    return this.documents.getAnalysis(this.ownerId(req), id);
+  }
+
   @Delete(':id')
   async remove(@Req() req: Request, @Param('id') id: string) {
     await this.documents.remove(this.ownerId(req), id);

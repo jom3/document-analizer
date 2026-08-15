@@ -1,6 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Document, DocumentPage, DocumentsService } from '../../documents/documents.service';
+import {
+  Document,
+  DocumentAnalysis,
+  DocumentPage,
+  DocumentsService,
+} from '../../documents/documents.service';
 
 @Component({
   selector: 'app-document-detail-page',
@@ -27,6 +32,33 @@ import { Document, DocumentPage, DocumentsService } from '../../documents/docume
 
       @if (error()) {
         <p class="error">{{ error() }}</p>
+      }
+
+      @if (analysis()) {
+        <h2>Análisis IA</h2>
+        @if (analysis()!.status === 'FAILED') {
+          <p class="error">{{ analysis()!.errorMessage }}</p>
+        } @else {
+          <p class="analysis-summary">{{ analysis()!.summary }}</p>
+          <p class="meta">
+            <span class="type">{{ typeLabel(analysis()!.documentType) }}</span>
+            · Confidencia: {{ analysis()!.confidence }}%
+            ({{ confidenceLabel(analysis()!.confidence) }})
+            @if (analysis()!.truncated) {
+              · <span class="warn">Texto truncado al analizar</span>
+            }
+          </p>
+          @if (keyEntries(analysis()!).length > 0) {
+            <table class="key-info">
+              @for (entry of keyEntries(analysis()!); track entry[0]) {
+                <tr>
+                  <td>{{ keyLabel(entry[0]) }}</td>
+                  <td>{{ entry[1] }}</td>
+                </tr>
+              }
+            </table>
+          }
+        }
       }
 
       <h2>Páginas</h2>
@@ -99,6 +131,49 @@ import { Document, DocumentPage, DocumentsService } from '../../documents/docume
       font-size: 0.875rem;
     }
 
+    .detail .analysis-summary {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .detail .type {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
+    .detail .warn {
+      color: #8a5300;
+    }
+
+    .detail .key-info {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+
+    .detail .key-info td {
+      border: 1px solid #ddd;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+
+    .detail .key-info td:first-child {
+      width: 40%;
+      background: #f7f7f7;
+      color: #555;
+      font-weight: 600;
+    }
+
     .detail .page-block {
       background: #fff;
       border: 1px solid #ddd;
@@ -128,6 +203,7 @@ export class DocumentDetailPage implements OnInit {
 
   readonly document = signal<Document | null>(null);
   readonly pages = signal<DocumentPage[]>([]);
+  readonly analysis = signal<DocumentAnalysis | null>(null);
   readonly error = signal<string | null>(null);
 
   ngOnInit(): void {
@@ -135,7 +211,15 @@ export class DocumentDetailPage implements OnInit {
     if (!id) return;
 
     this.documentsService.getOne(id).subscribe({
-      next: (document) => this.document.set(document),
+      next: (document) => {
+        this.document.set(document);
+        if (document.status === 'COMPLETED') {
+          this.documentsService.getAnalysis(id).subscribe({
+            next: (analysis) => this.analysis.set(analysis),
+            error: () => undefined,
+          });
+        }
+      },
       error: () => this.error.set('No se pudo cargar el documento'),
     });
 
@@ -143,6 +227,57 @@ export class DocumentDetailPage implements OnInit {
       next: (pages) => this.pages.set(pages),
       error: () => this.error.set('No se pudieron cargar las páginas'),
     });
+  }
+
+  typeLabel(type: string | null): string {
+    switch (type) {
+      case 'invoice':
+        return 'Factura';
+      case 'resume':
+        return 'Currículum';
+      case 'contract':
+        return 'Contrato';
+      case 'generic':
+        return 'Documento genérico';
+      default:
+        return type ?? 'Desconocido';
+    }
+  }
+
+  confidenceLabel(confidence: number | null): string {
+    if (confidence === null) return 'desconocida';
+    if (confidence >= 80) return 'alta';
+    if (confidence >= 50) return 'media';
+    return 'baja';
+  }
+
+  keyEntries(analysis: DocumentAnalysis): [string, unknown][] {
+    return Object.entries(analysis.keyInfo ?? {}).filter(
+      ([, value]) => value !== null && value !== '' && !(Array.isArray(value) && value.length === 0),
+    );
+  }
+
+  keyLabel(key: string): string {
+    const labels: Record<string, string> = {
+      supplier: 'Proveedor',
+      customer: 'Cliente',
+      invoiceNumber: 'Nº factura',
+      issueDate: 'Fecha emisión',
+      dueDate: 'Fecha vencimiento',
+      total: 'Total',
+      currency: 'Moneda',
+      fullName: 'Nombre',
+      headline: 'Título profesional',
+      skills: 'Habilidades',
+      totalYearsExperience: 'Años de experiencia',
+      email: 'Email',
+      phone: 'Teléfono',
+      parties: 'Partes',
+      startDate: 'Fecha inicio',
+      endDate: 'Fecha fin',
+      value: 'Valor',
+    };
+    return labels[key] ?? key;
   }
 
   statusLabel(status: string): string {

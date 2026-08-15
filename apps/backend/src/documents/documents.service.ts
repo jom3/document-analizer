@@ -8,6 +8,7 @@ import { createReadStream } from 'node:fs';
 import { access, mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { DocumentStatus } from '../../generated/prisma/enums.js';
+import { DocumentAnalysisService } from '../ai/document-analysis.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DocumentProcessingService } from './document-processing.service.js';
 import {
@@ -27,6 +28,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly processing: DocumentProcessingService,
+    private readonly analysis: DocumentAnalysisService,
   ) {}
 
   async create(ownerId: string, input: CreateDocumentInput) {
@@ -85,6 +87,7 @@ export class DocumentsService {
   private async process(document: { id: string }): Promise<void> {
     try {
       await this.processing.processDocument(document.id);
+      await this.analysis.analyze(document.id);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Error desconocido';
@@ -140,6 +143,17 @@ export class DocumentsService {
       orderBy: { pageNumber: 'asc' },
       select: { pageNumber: true, text: true },
     });
+  }
+
+  async getAnalysis(ownerId: string, id: string) {
+    await this.findOne(ownerId, id);
+    const analysis = await this.prisma.documentAnalysis.findUnique({
+      where: { documentId: id },
+    });
+    if (!analysis) {
+      throw new NotFoundException('Análisis no encontrado');
+    }
+    return analysis;
   }
 
   async remove(ownerId: string, id: string) {
