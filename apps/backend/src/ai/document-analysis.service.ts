@@ -4,6 +4,7 @@ import { AnalysisStatus } from '../../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MAX_ANALYSIS_CHARS } from './ai.constants.js';
 import { OpenAiService } from './openai.service.js';
+import { validateKeyInfo } from './schemas/key-info.zod.js';
 
 @Injectable()
 export class DocumentAnalysisService {
@@ -28,6 +29,7 @@ export class DocumentAnalysisService {
 
     try {
       const result = await this.openai.analyzeDocument(input);
+      validateKeyInfo(result.documentType, result.keyInfo);
       await this.saveAnalysis(documentId, {
         status: AnalysisStatus.COMPLETED,
         documentType: result.documentType,
