@@ -22,12 +22,58 @@ export interface DocumentPage {
   text: string;
 }
 
+export interface InvoiceKeyInfo {
+  invoiceNumber: string | null;
+  date: string | null;
+  supplier: string | null;
+  customer: string | null;
+  subtotal: number | null;
+  tax: number | null;
+  total: number | null;
+  currency: string | null;
+}
+
+export interface ExperienceItem {
+  company: string | null;
+  role: string | null;
+  startDate: string | null;
+  endDate: string | null;
+}
+
+export interface EducationItem {
+  institution: string | null;
+  degree: string | null;
+  year: string | null;
+}
+
+export interface ResumeKeyInfo {
+  fullName: string | null;
+  email: string | null;
+  skills: string[];
+  experience: ExperienceItem[];
+  education: EducationItem[];
+}
+
+export interface ContractKeyInfo {
+  parties: string[];
+  startDate: string | null;
+  endDate: string | null;
+  paymentTerms: string | null;
+  terminationConditions: string | null;
+}
+
+export type DocumentKeyInfo =
+  | InvoiceKeyInfo
+  | ResumeKeyInfo
+  | ContractKeyInfo
+  | Record<string, never>;
+
 export interface DocumentAnalysis {
   id: string;
   status: string;
   documentType: string | null;
   summary: string | null;
-  keyInfo: Record<string, unknown> | null;
+  keyInfo: DocumentKeyInfo | null;
   confidence: number | null;
   model: string;
   promptTokens: number;
