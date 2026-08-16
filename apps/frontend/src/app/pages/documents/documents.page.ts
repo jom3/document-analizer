@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Document, DocumentsService } from '../../documents/documents.service';
+import { Document, DocumentsService, SearchResultItem } from '../../documents/documents.service';
 
 const LIMIT = 10;
 
@@ -42,6 +42,40 @@ const LIMIT = 10;
           {{ submitting() ? 'Subiendo…' : 'Subir' }}
         </button>
       </div>
+
+      <div class="search">
+        <input type="text" placeholder="Buscar en tus documentos…" [value]="searchQuery()" (input)="onSearchQueryChange($event)" (keyup.enter)="onSearch()" />
+        <button type="button" (click)="onSearch()" [disabled]="searching() || !searchQuery().trim()">
+          {{ searching() ? 'Buscando…' : 'Buscar' }}
+        </button>
+      </div>
+
+      @if (searchError()) {
+        <p class="error">{{ searchError() }}</p>
+      }
+
+      @if (searchResults().length > 0) {
+        <table>
+          <thead>
+            <tr>
+              <th>Documento</th>
+              <th>Página</th>
+              <th>Fragmento</th>
+              <th>Similitud</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (result of searchResults(); track result.chunkId) {
+              <tr>
+                <td>{{ result.documentName }}</td>
+                <td>{{ result.pageNumber }}</td>
+                <td>{{ result.text }}</td>
+                <td>{{ formatScore(result.score) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
 
       @if (error()) {
         <p class="error">{{ error() }}</p>
@@ -125,6 +159,20 @@ const LIMIT = 10;
       width: 100%;
       padding: 0.5rem 0.6rem;
       margin-top: 0.25rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    .documents .search {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .documents .search input {
+      flex: 1;
+      padding: 0.5rem 0.6rem;
       border: 1px solid #ccc;
       border-radius: 6px;
       font-size: 1rem;
@@ -264,6 +312,11 @@ export class DocumentsPage implements OnInit {
   readonly uploadError = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
 
+  readonly searchQuery = signal('');
+  readonly searchResults = signal<SearchResultItem[]>([]);
+  readonly searching = signal(false);
+  readonly searchError = signal<string | null>(null);
+
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / LIMIT)));
@@ -302,6 +355,32 @@ export class DocumentsPage implements OnInit {
 
   onNameChange(event: Event): void {
     this.customName.set((event.target as HTMLInputElement).value);
+  }
+
+  onSearchQueryChange(event: Event): void {
+    this.searchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  onSearch(): void {
+    const query = this.searchQuery().trim();
+    if (!query) return;
+
+    this.searching.set(true);
+    this.searchError.set(null);
+    this.documentsService.search(query).subscribe({
+      next: (results) => {
+        this.searching.set(false);
+        this.searchResults.set(results);
+      },
+      error: () => {
+        this.searching.set(false);
+        this.searchError.set('No se pudo realizar la búsqueda');
+      },
+    });
+  }
+
+  formatScore(score: number): string {
+    return `${(score * 100).toFixed(1)}%`;
   }
 
   onSubmit(): void {

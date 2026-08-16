@@ -4,6 +4,6 @@ import { OpenAiService } from './openai.service.js';
 
 @Module({
   providers: [OpenAiService, DocumentAnalysisService],
-  exports: [DocumentAnalysisService],
+  exports: [DocumentAnalysisService, OpenAiService],
 })
 export class AiModule {}

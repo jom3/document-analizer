@@ -91,6 +91,15 @@ export interface DocumentList {
   limit: number;
 }
 
+export interface SearchResultItem {
+  chunkId: string;
+  documentId: string;
+  documentName: string;
+  pageNumber: number;
+  text: string;
+  score: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DocumentsService {
   private readonly http = inject(HttpClient);
@@ -123,6 +132,12 @@ export class DocumentsService {
 
   getAnalysis(id: string): Observable<DocumentAnalysis> {
     return this.http.get<DocumentAnalysis>(`/api/documents/${id}/analysis`);
+  }
+
+  search(query: string, documentId?: string): Observable<SearchResultItem[]> {
+    const params: Record<string, string | number> = { q: query };
+    if (documentId) params['documentId'] = documentId;
+    return this.http.get<SearchResultItem[]>('/api/search', { params });
   }
 
   remove(id: string): Observable<{ message: string }> {

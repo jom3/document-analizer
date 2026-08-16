@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:18.4-alpine3.24
+    image: pgvector/pgvector:pg18
     container_name: document-analyzer-db
     environment:
       POSTGRES_USER: postgres
