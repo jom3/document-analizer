@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { PdfViewerComponent } from '../../components/pdf-viewer/pdf-viewer.component';
 import {
   Document,
   DocumentAnalysis,
@@ -9,7 +10,7 @@ import {
 
 @Component({
   selector: 'app-document-detail-page',
-  imports: [RouterLink],
+  imports: [RouterLink, PdfViewerComponent],
   template: `
     <section class="page detail">
       <a routerLink="/documents" class="back">← Mis documentos</a>
@@ -17,75 +18,116 @@ import {
       @if (document()) {
         <header>
           <h1>{{ document()!.name }}</h1>
-          <p class="meta">
-            {{ document()!.originalName }}
-            @if (document()!.pageCount) { · {{ document()!.pageCount }} páginas }
-            @if (document()!.title) { · {{ document()!.title }} }
-            @if (document()!.author) { · {{ document()!.author }} }
-          </p>
           <span class="status" [class]="statusClass(document()!.status)">{{ statusLabel(document()!.status) }}</span>
-          @if (document()!.status === 'FAILED' && document()!.errorMessage) {
-            <p class="error">{{ document()!.errorMessage }}</p>
-          }
         </header>
+      } @else if (loadingDocument()) {
+        <p class="empty">Cargando documento…</p>
       }
 
       @if (error()) {
         <p class="error">{{ error() }}</p>
       }
 
-      @if (analysis()) {
-        <h2>Análisis IA</h2>
-        @if (analysis()!.status === 'FAILED') {
-          <p class="error">{{ analysis()!.errorMessage }}</p>
-        } @else {
-          <p class="analysis-summary">{{ analysis()!.summary }}</p>
-          <p class="meta">
-            <span class="type">{{ typeLabel(analysis()!.documentType) }}</span>
-            · Confidencia: {{ analysis()!.confidence }}%
-            ({{ confidenceLabel(analysis()!.confidence) }})
-            @if (analysis()!.truncated) {
-              · <span class="warn">Texto truncado al analizar</span>
+      <div class="detail-layout">
+        <div class="viewer-pane">
+          <div class="view-tabs">
+            <button type="button" [class.active]="viewMode() === 'pdf'" (click)="viewMode.set('pdf')">Ver PDF</button>
+            <button type="button" [class.active]="viewMode() === 'text'" (click)="viewMode.set('text')">Texto extraído</button>
+          </div>
+
+          @if (viewMode() === 'pdf') {
+            <div class="pdf-host">
+              @if (pdfLoading()) {
+                <p class="empty">Cargando PDF…</p>
+              } @else if (pdfError()) {
+                <p class="error">{{ pdfError() }}</p>
+              } @else {
+                <app-pdf-viewer [pdfBlob]="pdfBlob()" (downloadRequested)="download()" />
+              }
+            </div>
+          } @else {
+            @if (pages().length === 0) {
+              @if (loadingPages()) {
+                <p class="empty">Cargando texto…</p>
+              } @else {
+                <p class="empty">Este documento aún no tiene texto extraído.</p>
+              }
             }
-          </p>
-          @if (keyEntries(analysis()!).length > 0) {
-            <table class="key-info">
-              @for (entry of keyEntries(analysis()!); track entry[0]) {
-                @if (isObjectList(entry[1])) {
-                  <tr>
-                    <td>{{ keyLabel(entry[0]) }}</td>
-                    <td>
-                      @for (item of objectList(entry[1]); track $index) {
-                        <div class="key-item">
-                          @for (sub of itemEntries(item); track sub[0]) {
-                            <span class="key-sub"><strong>{{ keyLabel(sub[0]) }}:</strong> {{ sub[1] }}</span>
-                          }
-                        </div>
+            @for (page of pages(); track page.pageNumber) {
+              <article class="page-block">
+                <h3>Página {{ page.pageNumber }}</h3>
+                <pre>{{ page.text || 'Sin texto' }}</pre>
+              </article>
+            }
+          }
+        </div>
+
+        <aside class="analysis-pane">
+          @if (document()) {
+            <section class="panel">
+              <h2>Información</h2>
+              <dl class="info-list">
+                <dt>Archivo</dt><dd>{{ document()!.originalName }}</dd>
+                <dt>Tamaño</dt><dd>{{ formatSize(document()!.size) }}</dd>
+                <dt>Páginas</dt><dd>{{ document()!.pageCount ?? '—' }}</dd>
+                <dt>Estado</dt><dd>{{ statusLabel(document()!.status) }}</dd>
+                <dt>Subido</dt><dd>{{ formatDate(document()!.createdAt) }}</dd>
+              </dl>
+              @if (document()!.status === 'FAILED' && document()!.errorMessage) {
+                <p class="error">{{ document()!.errorMessage }}</p>
+              }
+            </section>
+          }
+
+          <section class="panel">
+            <h2>Análisis IA</h2>
+            @if (loadingAnalysis()) {
+              <p class="empty">Cargando análisis…</p>
+            } @else if (analysis()) {
+              @if (analysis()!.status === 'FAILED') {
+                <p class="error">{{ analysis()!.errorMessage }}</p>
+              } @else {
+                <p class="analysis-summary">{{ analysis()!.summary }}</p>
+                <p class="meta">
+                  <span class="type">{{ typeLabel(analysis()!.documentType) }}</span>
+                  · Confidencia: {{ analysis()!.confidence }}%
+                  ({{ confidenceLabel(analysis()!.confidence) }})
+                  @if (analysis()!.truncated) {
+                    · <span class="warn">Texto truncado al analizar</span>
+                  }
+                </p>
+                @if (keyEntries(analysis()!).length > 0) {
+                  <table class="key-info">
+                    @for (entry of keyEntries(analysis()!); track entry[0]) {
+                      @if (isObjectList(entry[1])) {
+                        <tr>
+                          <td>{{ keyLabel(entry[0]) }}</td>
+                          <td>
+                            @for (item of objectList(entry[1]); track $index) {
+                              <div class="key-item">
+                                @for (sub of itemEntries(item); track sub[0]) {
+                                  <span class="key-sub"><strong>{{ keyLabel(sub[0]) }}:</strong> {{ sub[1] }}</span>
+                                }
+                              </div>
+                            }
+                          </td>
+                        </tr>
+                      } @else {
+                        <tr>
+                          <td>{{ keyLabel(entry[0]) }}</td>
+                          <td>{{ formatScalar(entry[1]) }}</td>
+                        </tr>
                       }
-                    </td>
-                  </tr>
-                } @else {
-                  <tr>
-                    <td>{{ keyLabel(entry[0]) }}</td>
-                    <td>{{ formatScalar(entry[1]) }}</td>
-                  </tr>
+                    }
+                  </table>
                 }
               }
-            </table>
-          }
-        }
-      }
-
-      <h2>Páginas</h2>
-      @if (pages().length === 0 && !error()) {
-        <p class="empty">Este documento aún no tiene texto extraído.</p>
-      }
-      @for (page of pages(); track page.pageNumber) {
-        <article class="page-block">
-          <h3>Página {{ page.pageNumber }}</h3>
-          <pre>{{ page.text || 'Sin texto' }}</pre>
-        </article>
-      }
+            } @else {
+              <p class="empty">Este documento aún no tiene análisis.</p>
+            }
+          </section>
+        </aside>
+      </div>
     </section>
   `,
   styles: `
@@ -98,17 +140,14 @@ import {
     }
 
     .detail header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
       margin-bottom: 1.5rem;
     }
 
     .detail h1 {
-      margin: 0 0 0.25rem;
-    }
-
-    .detail .meta {
-      margin: 0 0 0.5rem;
-      font-size: 0.875rem;
-      color: #777;
+      margin: 0;
     }
 
     .detail .status {
@@ -146,6 +185,87 @@ import {
       font-size: 0.875rem;
     }
 
+    .detail .detail-layout {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+
+    .detail .viewer-pane {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .detail .view-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .detail .view-tabs button {
+      padding: 0.4rem 1rem;
+      border: 1px solid #ccc;
+      border-radius: 999px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .detail .view-tabs button.active {
+      background: #1a73e8;
+      border-color: #1a73e8;
+      color: #fff;
+    }
+
+    .detail .pdf-host {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      overflow: hidden;
+      height: 72vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .detail .analysis-pane {
+      width: 360px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .detail .panel {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 1rem;
+    }
+
+    .detail .panel h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #555;
+    }
+
+    .detail .info-list {
+      margin: 0;
+      font-size: 0.8125rem;
+    }
+
+    .detail .info-list dt {
+      font-weight: 600;
+      color: #555;
+      margin-top: 0.4rem;
+    }
+
+    .detail .info-list dd {
+      margin: 0;
+      word-break: break-word;
+    }
+
     .detail .analysis-summary {
       background: #fff;
       border: 1px solid #ddd;
@@ -163,6 +283,12 @@ import {
       font-weight: 600;
       background: #e8f0fe;
       color: #1a73e8;
+    }
+
+    .detail .meta {
+      margin: 0.5rem 0;
+      font-size: 0.875rem;
+      color: #777;
     }
 
     .detail .warn {
@@ -223,6 +349,16 @@ import {
       font-size: 0.875rem;
       line-height: 1.5;
     }
+
+    @media (max-width: 900px) {
+      .detail .detail-layout {
+        flex-direction: column;
+      }
+
+      .detail .analysis-pane {
+        width: 100%;
+      }
+    }
   `,
 })
 export class DocumentDetailPage implements OnInit {
@@ -234,6 +370,15 @@ export class DocumentDetailPage implements OnInit {
   readonly analysis = signal<DocumentAnalysis | null>(null);
   readonly error = signal<string | null>(null);
 
+  readonly loadingDocument = signal(true);
+  readonly loadingPages = signal(true);
+  readonly loadingAnalysis = signal(false);
+
+  readonly pdfBlob = signal<Blob | null>(null);
+  readonly pdfLoading = signal(false);
+  readonly pdfError = signal<string | null>(null);
+  readonly viewMode = signal<'pdf' | 'text'>('pdf');
+
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
@@ -241,19 +386,64 @@ export class DocumentDetailPage implements OnInit {
     this.documentsService.getOne(id).subscribe({
       next: (document) => {
         this.document.set(document);
+        this.loadingDocument.set(false);
+        this.loadPdf(document);
         if (document.status === 'COMPLETED') {
+          this.loadingAnalysis.set(true);
           this.documentsService.getAnalysis(id).subscribe({
-            next: (analysis) => this.analysis.set(analysis),
-            error: () => undefined,
+            next: (analysis) => {
+              this.analysis.set(analysis);
+              this.loadingAnalysis.set(false);
+            },
+            error: () => this.loadingAnalysis.set(false),
           });
         }
       },
-      error: () => this.error.set('No se pudo cargar el documento'),
+      error: () => {
+        this.error.set('No se pudo cargar el documento');
+        this.loadingDocument.set(false);
+      },
     });
 
     this.documentsService.getPages(id).subscribe({
-      next: (pages) => this.pages.set(pages),
-      error: () => this.error.set('No se pudieron cargar las páginas'),
+      next: (pages) => {
+        this.pages.set(pages);
+        this.loadingPages.set(false);
+      },
+      error: () => {
+        this.error.set('No se pudieron cargar las páginas');
+        this.loadingPages.set(false);
+      },
+    });
+  }
+
+  download(): void {
+    const doc = this.document();
+    if (!doc) return;
+    this.documentsService.download(doc).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.originalName;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+    });
+  }
+
+  private loadPdf(document: Document): void {
+    this.pdfLoading.set(true);
+    this.pdfError.set(null);
+    this.documentsService.download(document).subscribe({
+      next: (blob) => {
+        this.pdfBlob.set(blob);
+        this.pdfLoading.set(false);
+      },
+      error: () => {
+        this.pdfError.set('No se pudo cargar el PDF');
+        this.pdfLoading.set(false);
+      },
     });
   }
 
@@ -304,6 +494,16 @@ export class DocumentDetailPage implements OnInit {
       return (value as unknown[]).map(String).join(', ');
     }
     return String(value);
+  }
+
+  formatSize(bytes: number): string {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  }
+
+  formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString();
   }
 
   keyLabel(key: string): string {
