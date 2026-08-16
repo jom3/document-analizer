@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, output, signal } from '@angular/core';
 import {
   ChatCitation,
   ChatMessage,
@@ -63,9 +63,13 @@ import {
                     <details class="sources">
                       <summary>Fuentes ({{ message.citations.length }})</summary>
                       @for (source of message.citations; track source.chunkId) {
-                        <p class="source">
+                        <button
+                          type="button"
+                          class="source"
+                          (click)="onSourceClick(source)"
+                        >
                           Página {{ source.pageNumber }} · score {{ source.score }}: {{ source.text }}
-                        </p>
+                        </button>
                       }
                     </details>
                   }
@@ -82,9 +86,13 @@ import {
                     <details class="sources">
                       <summary>Fuentes ({{ streamSources().length }})</summary>
                       @for (source of streamSources(); track source.chunkId) {
-                        <p class="source">
+                        <button
+                          type="button"
+                          class="source"
+                          (click)="onSourceClick(source)"
+                        >
                           Página {{ source.pageNumber }} · score {{ source.score }}: {{ source.text }}
-                        </p>
+                        </button>
                       }
                     </details>
                   }
@@ -240,11 +248,23 @@ import {
     }
 
     .source {
+      display: block;
       margin: 0.25rem 0;
       padding: 0.35rem 0.5rem;
-      border-left: 2px solid #ccc;
+      border: 1px solid #e0e0e0;
+      border-left: 2px solid #1a73e8;
+      border-radius: 6px;
       background: #fafafa;
+      color: #333;
+      text-align: left;
+      font-size: inherit;
+      cursor: pointer;
       line-height: 1.4;
+      max-width: 100%;
+    }
+
+    .source:hover {
+      background: #eef4fd;
     }
 
     .composer {
@@ -315,6 +335,7 @@ import {
 })
 export class DocumentChatComponent implements OnInit {
   readonly documentId = input.required<string>();
+  readonly sourceSelected = output<{ pageNumber: number; text: string }>();
 
   private readonly documentsService = inject(DocumentsService);
 
@@ -422,6 +443,10 @@ export class DocumentChatComponent implements OnInit {
         }
       },
     });
+  }
+
+  onSourceClick(source: ChatCitation): void {
+    this.sourceSelected.emit({ pageNumber: source.pageNumber, text: source.text });
   }
 
   reindex(): void {

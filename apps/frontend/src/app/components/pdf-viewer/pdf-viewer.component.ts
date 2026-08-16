@@ -3,6 +3,20 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
 
+interface HighlightRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface PdfTextItem {
+  str: string;
+  transform: number[];
+  width: number;
+  height: number;
+}
+
 @Component({
   selector: 'app-pdf-viewer',
   imports: [],
@@ -38,7 +52,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
         } @else if (error()) {
           <p class="viewer-state error">{{ error() }}</p>
         } @else if (pdfBlob()) {
-          <canvas #canvas></canvas>
+          <div class="pdf-frame">
+            <canvas #canvas></canvas>
+            <div class="pdf-overlay" #overlay></div>
+          </div>
         } @else {
           <p class="viewer-state">Sin PDF para mostrar</p>
         }
@@ -119,6 +136,24 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
       background: #fff;
     }
 
+    .pdf-frame {
+      position: relative;
+      line-height: 0;
+    }
+
+    .pdf-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .pdf-overlay .highlight {
+      position: absolute;
+      background: rgb(255 213 79 / 45%);
+      border-radius: 2px;
+    }
+
     .viewer-state {
       margin: auto;
       color: #777;
@@ -132,10 +167,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
 })
 export class PdfViewerComponent implements OnDestroy {
   readonly pdfBlob = input<Blob | null>(null);
+  readonly navigateTo = input<{ pageNumber: number; text: string } | null>(null);
   readonly downloadRequested = output<void>();
 
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
+  private readonly overlay = viewChild<ElementRef<HTMLDivElement>>('overlay');
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
@@ -143,6 +180,9 @@ export class PdfViewerComponent implements OnDestroy {
   readonly currentPage = signal(1);
   readonly scale = signal(1);
   readonly zoomPercent = computed(() => Math.round(this.scale() * 100));
+  readonly highlight = signal<{ pageNumber: number; text: string } | null>(null);
+  private readonly renderedPage = signal<number | null>(null);
+  private highlightVersion = 0;
 
   private readonly documentSignal = signal<pdfjsLib.PDFDocumentProxy | null>(null);
   private renderTask: pdfjsLib.RenderTask | null = null;
@@ -160,9 +200,177 @@ export class PdfViewerComponent implements OnDestroy {
     }
   });
 
+  private readonly navigateEffect = effect(() => {
+    const target = this.navigateTo();
+    if (!target) {
+      this.highlight.set(null);
+      return;
+    }
+    this.highlight.set({ pageNumber: target.pageNumber, text: target.text });
+    if (this.currentPage() !== target.pageNumber) {
+      this.currentPage.set(target.pageNumber);
+      void this.fitWidthScale().then((scale) => {
+        if (this.currentPage() === target.pageNumber) {
+          this.scale.set(scale);
+        }
+      });
+    }
+  });
+
+  private readonly highlightEffect = effect(() => {
+    const highlight = this.highlight();
+    const page = this.currentPage();
+    const scale = this.scale();
+    if (highlight && page === highlight.pageNumber && this.renderedPage() === page) {
+      void this.applyHighlight(highlight, scale);
+    } else {
+      this.clearHighlight();
+    }
+  });
+
+  private async applyHighlight(
+    highlight: { pageNumber: number; text: string },
+    scale: number,
+  ): Promise<void> {
+    const highlightVersion = ++this.highlightVersion;
+    this.clearHighlight();
+    const doc = this.documentSignal();
+    if (!doc) return;
+    const page = await doc.getPage(highlight.pageNumber);
+    const content = await page.getTextContent();
+    if (this.highlightVersion !== highlightVersion || this.currentPage() !== highlight.pageNumber) {
+      return;
+    }
+
+    const items = content.items.filter((item) => 'str' in item) as PdfTextItem[];
+
+    const { text, itemOffsets } = this.buildNormalizedText(items);
+    const fragment = this.normalizeText(highlight.text);
+    const match = this.findMatch(text, fragment);
+    if (!match) return;
+
+    const viewport = page.getViewport({ scale });
+    const rects: HighlightRect[] = [];
+    for (let index = 0; index < itemOffsets.length; index++) {
+      const offset = itemOffsets[index];
+      if (offset.end <= match.start || offset.start >= match.end) {
+        continue;
+      }
+      const overlapStart = Math.max(offset.start, match.start);
+      const overlapEnd = Math.min(offset.end, match.end);
+      const item = items[index];
+      const full = this.itemRect(item, viewport);
+      if (!full) continue;
+      const itemLength = offset.end - offset.start;
+      if (itemLength <= 0) continue;
+      const fractionStart = (overlapStart - offset.start) / itemLength;
+      const fractionEnd = (overlapEnd - offset.start) / itemLength;
+      rects.push({
+        left: full.left + full.width * fractionStart,
+        top: full.top,
+        width: full.width * (fractionEnd - fractionStart),
+        height: full.height,
+      });
+    }
+
+    this.drawHighlightRects(rects);
+  }
+
+  private buildNormalizedText(
+    items: PdfTextItem[],
+  ): { text: string; itemOffsets: { start: number; end: number }[] } {
+    let text = '';
+    const itemOffsets: { start: number; end: number }[] = [];
+    for (const item of items) {
+      const normalized = this.normalizeText(item.str);
+      if (!normalized) {
+        itemOffsets.push({ start: text.length, end: text.length });
+        continue;
+      }
+      if (text.length > 0) {
+        text += ' ';
+      }
+      const start = text.length;
+      text += normalized;
+      itemOffsets.push({ start, end: text.length });
+    }
+    return { text, itemOffsets };
+  }
+
+  private normalizeText(value: string): string {
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
+  private findMatch(
+    text: string,
+    fragment: string,
+  ): { start: number; end: number } | null {
+    if (!fragment) return null;
+    const minLength = Math.min(30, fragment.length);
+    for (let length = fragment.length; length >= minLength; length--) {
+      const prefix = fragment.slice(0, length);
+      const index = text.indexOf(prefix);
+      if (index !== -1) {
+        return { start: index, end: index + length };
+      }
+    }
+    return null;
+  }
+
+  private itemRect(
+    item: PdfTextItem,
+    viewport: pdfjsLib.PageViewport,
+  ): { left: number; top: number; width: number; height: number } | null {
+    const [a, b, c, d, e, f] = item.transform;
+    const advanceLength = Math.hypot(a, b);
+    if (advanceLength === 0) {
+      return null;
+    }
+    const ax = a / advanceLength;
+    const ay = b / advanceLength;
+    const ux = -ay;
+    const uy = ax;
+    const base = [
+      [e, f],
+      [e + ax * item.width, f + ay * item.width],
+    ];
+    const top = base.map(([x, y]) => [x + ux * item.height, y + uy * item.height]);
+    const corners = [...base, ...top];
+    const points = corners.map(([x, y]) => viewport.convertToViewportPoint(x, y));
+    const lefts = points.map((p) => p[0]);
+    const tops = points.map((p) => p[1]);
+    const minX = Math.min(...lefts);
+    const maxX = Math.max(...lefts);
+    const minY = Math.min(...tops);
+    const maxY = Math.max(...tops);
+    return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  private drawHighlightRects(rects: HighlightRect[]): void {
+    const overlay = this.overlay()?.nativeElement;
+    if (!overlay) return;
+    overlay.querySelectorAll('.highlight').forEach((node) => node.remove());
+    for (const rect of rects) {
+      const div = document.createElement('div');
+      div.className = 'highlight';
+      div.style.left = `${rect.left}px`;
+      div.style.top = `${rect.top}px`;
+      div.style.width = `${rect.width}px`;
+      div.style.height = `${rect.height}px`;
+      overlay.appendChild(div);
+    }
+  }
+
+  private clearHighlight(): void {
+    const overlay = this.overlay()?.nativeElement;
+    if (!overlay) return;
+    overlay.querySelectorAll('.highlight').forEach((node) => node.remove());
+  }
+
   private async loadPdf(blob: Blob | null): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
+    this.renderedPage.set(null);
     // Diferir el resto tras un await para que el effect no trackee
     // lecturas de documentSignal() (evita el bucle crear/destruir).
     await Promise.resolve();
@@ -227,6 +435,7 @@ export class PdfViewerComponent implements OnDestroy {
       this.renderTask = page.render({ canvas, canvasContext: context, viewport });
       try {
         await this.renderTask.promise;
+        this.renderedPage.set(pageNumber);
       } catch {
         // Render cancelado al cambiar de página o de zoom.
       } finally {
@@ -276,6 +485,8 @@ export class PdfViewerComponent implements OnDestroy {
   }
 
   async ngOnDestroy(): Promise<void> {
+    this.highlightVersion++;
+    this.clearHighlight();
     this.cancelRender();
     await this.documentSignal()?.loadingTask.destroy();
   }
