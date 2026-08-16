@@ -6,6 +6,9 @@
 /out-tsc
 /bazel-out
 
+# Generated assets (copied by scripts/copy-pdf-worker.mjs)
+/public/pdfjs
+
 # Node
 /node_modules
 npm-debug.log
