@@ -3,6 +3,10 @@ import OpenAI from 'openai';
 import { DEFAULT_MODEL } from './ai.constants.js';
 import { ANALYSIS_SYSTEM_PROMPT } from './prompts/analysis.system.js';
 import { ANALYSIS_JSON_SCHEMA } from './schemas/analysis.schema.js';
+import {
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL,
+} from '../search/search.constants.js';
 
 export interface DocumentAnalysisResult {
   documentType: string;
@@ -12,6 +16,11 @@ export interface DocumentAnalysisResult {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  totalTokens: number;
+}
+
+export interface EmbeddingsResult {
+  embeddings: number[][];
   totalTokens: number;
 }
 
@@ -30,6 +39,23 @@ export class OpenAiService {
 
   private get model(): string {
     return process.env.OPENAI_MODEL ?? DEFAULT_MODEL;
+  }
+
+  private get embeddingModel(): string {
+    return process.env.EMBEDDING_MODEL ?? EMBEDDING_MODEL;
+  }
+
+  async createEmbeddings(texts: string[]): Promise<EmbeddingsResult> {
+    const response = await this.client.embeddings.create({
+      model: this.embeddingModel,
+      dimensions: EMBEDDING_DIMENSIONS,
+      input: texts,
+    });
+
+    return {
+      embeddings: response.data.map((item) => item.embedding),
+      totalTokens: response.usage?.total_tokens ?? 0,
+    };
   }
 
   async analyzeDocument(text: string): Promise<DocumentAnalysisResult> {

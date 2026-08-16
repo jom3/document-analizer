@@ -9,6 +9,7 @@ import { access, mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { DocumentStatus } from '../../generated/prisma/enums.js';
 import { DocumentAnalysisService } from '../ai/document-analysis.service.js';
+import { DocumentIndexService } from '../search/document-index.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DocumentProcessingService } from './document-processing.service.js';
 import {
@@ -29,6 +30,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly processing: DocumentProcessingService,
     private readonly analysis: DocumentAnalysisService,
+    private readonly indexer: DocumentIndexService,
   ) {}
 
   async create(ownerId: string, input: CreateDocumentInput) {
@@ -98,7 +100,10 @@ export class DocumentsService {
           errorMessage: message,
         },
       });
+      return;
     }
+
+    await this.indexer.indexDocument(document.id);
   }
 
   async findAll(ownerId: string, page: number, limit: number) {
@@ -154,6 +159,13 @@ export class DocumentsService {
       throw new NotFoundException('Análisis no encontrado');
     }
     return analysis;
+  }
+
+  async reindex(ownerId: string, id: string) {
+    await this.findOne(ownerId, id);
+    await this.indexer.deleteChunks(id);
+    await this.indexer.indexDocument(id);
+    return { message: 'Documento reindexado' };
   }
 
   async remove(ownerId: string, id: string) {
