@@ -6,7 +6,9 @@ export class MailService {
   private resend: Resend | null = null;
 
   private get from(): string {
-    return process.env.RESEND_FROM ?? 'Document Analyzer <onboarding@resend.dev>';
+    return (
+      process.env.RESEND_FROM ?? 'Document Analyzer <onboarding@resend.dev>'
+    );
   }
 
   private get client(): Resend {

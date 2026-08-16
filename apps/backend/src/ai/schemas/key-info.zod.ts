@@ -111,10 +111,7 @@ const schemasByType: Record<string, z.ZodType> = {
   generic: genericKeyInfoSchema,
 };
 
-export function validateKeyInfo(
-  documentType: string,
-  keyInfo: unknown,
-): void {
+export function validateKeyInfo(documentType: string, keyInfo: unknown): void {
   const schema = schemasByType[documentType];
   if (!schema) {
     throw new Error(`No hay schema de keyInfo para el tipo '${documentType}'`);

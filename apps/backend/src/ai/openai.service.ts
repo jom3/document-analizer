@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
+import type { CompletionUsage } from 'openai/resources/completions';
 import { DEFAULT_MODEL } from './ai.constants.js';
 import { ANALYSIS_SYSTEM_PROMPT } from './prompts/analysis.system.js';
 import { ANALYSIS_JSON_SCHEMA } from './schemas/analysis.schema.js';
@@ -7,6 +9,11 @@ import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MODEL,
 } from '../search/search.constants.js';
+import {
+  CHAT_MAX_OUTPUT_TOKENS,
+  CHAT_MODEL,
+  CHAT_TEMPERATURE,
+} from '../chat/chat.constants.js';
 
 export interface DocumentAnalysisResult {
   documentType: string;
@@ -22,6 +29,12 @@ export interface DocumentAnalysisResult {
 export interface EmbeddingsResult {
   embeddings: number[][];
   totalTokens: number;
+}
+
+export interface StreamChatResult {
+  model: string;
+  deltas: AsyncIterable<string>;
+  usage: CompletionUsage | undefined;
 }
 
 @Injectable()
@@ -45,6 +58,10 @@ export class OpenAiService {
     return process.env.EMBEDDING_MODEL ?? EMBEDDING_MODEL;
   }
 
+  private get chatModel(): string {
+    return process.env.CHAT_MODEL ?? CHAT_MODEL;
+  }
+
   async createEmbeddings(texts: string[]): Promise<EmbeddingsResult> {
     const response = await this.client.embeddings.create({
       model: this.embeddingModel,
@@ -55,6 +72,41 @@ export class OpenAiService {
     return {
       embeddings: response.data.map((item) => item.embedding),
       totalTokens: response.usage?.total_tokens ?? 0,
+    };
+  }
+
+  async streamChatCompletion(
+    messages: ChatCompletionMessageParam[],
+  ): Promise<StreamChatResult> {
+    const stream = await this.client.chat.completions.create({
+      model: this.chatModel,
+      temperature: CHAT_TEMPERATURE,
+      max_tokens: CHAT_MAX_OUTPUT_TOKENS,
+      stream: true,
+      stream_options: { include_usage: true },
+      messages,
+    });
+
+    const holder: { usage?: CompletionUsage } = {};
+
+    async function* generateDeltas(): AsyncIterable<string> {
+      for await (const chunk of stream) {
+        if (chunk.usage) {
+          holder.usage = chunk.usage;
+        }
+        const delta = chunk.choices[0]?.delta?.content;
+        if (delta) {
+          yield delta;
+        }
+      }
+    }
+
+    return {
+      model: this.chatModel,
+      deltas: generateDeltas(),
+      get usage() {
+        return holder.usage;
+      },
     };
   }
 

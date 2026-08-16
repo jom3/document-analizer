@@ -1,6 +1,6 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpDownloadProgressEvent, HttpEventType } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { concatMap, filter, map, Observable } from 'rxjs';
 
 export interface Document {
   id: string;
@@ -100,6 +100,41 @@ export interface SearchResultItem {
   score: number;
 }
 
+export interface ChatCitation {
+  chunkId: string;
+  pageNumber: number;
+  text: string;
+  score: number;
+}
+
+export interface ChatSession {
+  id: string;
+  documentId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  citations: ChatCitation[] | null;
+  model: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export type ChatStreamEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'sources'; sources: ChatCitation[] }
+  | { type: 'done'; messageId: string }
+  | { type: 'error'; message: string };
+
 @Injectable({ providedIn: 'root' })
 export class DocumentsService {
   private readonly http = inject(HttpClient);
@@ -142,5 +177,73 @@ export class DocumentsService {
 
   remove(id: string): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`/api/documents/${id}`);
+  }
+
+  reindex(id: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`/api/documents/${id}/reindex`, {});
+  }
+
+  listChatSessions(documentId: string): Observable<ChatSession[]> {
+    return this.http.get<ChatSession[]>('/api/chat/sessions', {
+      params: { documentId },
+    });
+  }
+
+  createChatSession(documentId: string, title?: string): Observable<ChatSession> {
+    return this.http.post<ChatSession>('/api/chat/sessions', { documentId, title });
+  }
+
+  renameChatSession(id: string, title: string): Observable<ChatSession> {
+    return this.http.patch<ChatSession>(`/api/chat/sessions/${id}`, { title });
+  }
+
+  deleteChatSession(id: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`/api/chat/sessions/${id}`);
+  }
+
+  listChatMessages(sessionId: string): Observable<ChatMessage[]> {
+    return this.http.get<ChatMessage[]>(`/api/chat/sessions/${sessionId}/messages`);
+  }
+
+  streamChatMessage(
+    sessionId: string,
+    content: string,
+  ): Observable<ChatStreamEvent> {
+    let cursor = 0;
+    return this.http
+      .request('POST', `/api/chat/sessions/${sessionId}/messages`, {
+        body: { content },
+        responseType: 'text',
+        reportProgress: true,
+        observe: 'events',
+      })
+      .pipe(
+        filter(
+          (event): event is HttpDownloadProgressEvent =>
+            event.type === HttpEventType.DownloadProgress,
+        ),
+        concatMap((event) => {
+          const text = event.partialText ?? '';
+          const parsed = this.parseSse(text.slice(cursor));
+          cursor = text.length;
+          return parsed;
+        }),
+      );
+  }
+
+  private parseSse(text: string): ChatStreamEvent[] {
+    const events: ChatStreamEvent[] = [];
+    for (const line of text.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        continue;
+      }
+      try {
+        events.push(JSON.parse(trimmed.slice(5).trim()) as ChatStreamEvent);
+      } catch {
+        // Línea SSE incompleta o malformada: se ignora.
+      }
+    }
+    return events;
   }
 }

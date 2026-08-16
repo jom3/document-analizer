@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PdfViewerComponent } from '../../components/pdf-viewer/pdf-viewer.component';
+import { DocumentChatComponent } from '../../components/document-chat/document-chat.component';
 import {
   Document,
   DocumentAnalysis,
@@ -10,7 +11,7 @@ import {
 
 @Component({
   selector: 'app-document-detail-page',
-  imports: [RouterLink, PdfViewerComponent],
+  imports: [RouterLink, PdfViewerComponent, DocumentChatComponent],
   template: `
     <section class="page detail">
       <a routerLink="/documents" class="back">← Mis documentos</a>
@@ -33,6 +34,7 @@ import {
           <div class="view-tabs">
             <button type="button" [class.active]="viewMode() === 'pdf'" (click)="viewMode.set('pdf')">Ver PDF</button>
             <button type="button" [class.active]="viewMode() === 'text'" (click)="viewMode.set('text')">Texto extraído</button>
+            <button type="button" [class.active]="viewMode() === 'chat'" (click)="viewMode.set('chat')">Chat</button>
           </div>
 
           @if (viewMode() === 'pdf') {
@@ -45,7 +47,7 @@ import {
                 <app-pdf-viewer [pdfBlob]="pdfBlob()" (downloadRequested)="download()" />
               }
             </div>
-          } @else {
+          } @else if (viewMode() === 'text') {
             @if (pages().length === 0) {
               @if (loadingPages()) {
                 <p class="empty">Cargando texto…</p>
@@ -58,6 +60,12 @@ import {
                 <h3>Página {{ page.pageNumber }}</h3>
                 <pre>{{ page.text || 'Sin texto' }}</pre>
               </article>
+            }
+          } @else {
+            @if (document()) {
+              <div class="chat-host">
+                <app-document-chat [documentId]="document()!.id" />
+              </div>
             }
           }
         </div>
@@ -227,6 +235,10 @@ import {
       justify-content: center;
     }
 
+    .detail .chat-host {
+      height: 72vh;
+    }
+
     .detail .analysis-pane {
       width: 360px;
       flex-shrink: 0;
@@ -377,7 +389,7 @@ export class DocumentDetailPage implements OnInit {
   readonly pdfBlob = signal<Blob | null>(null);
   readonly pdfLoading = signal(false);
   readonly pdfError = signal<string | null>(null);
-  readonly viewMode = signal<'pdf' | 'text'>('pdf');
+  readonly viewMode = signal<'pdf' | 'text' | 'chat'>('pdf');
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

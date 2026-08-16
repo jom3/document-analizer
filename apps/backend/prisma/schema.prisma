@@ -24,6 +24,7 @@ model User {
   createdAt                     DateTime  @default(now())
   updatedAt                     DateTime  @updatedAt
   documents                     Document[]
+  chatSessions                  ChatSession[]
 }
 
 enum DocumentStatus {
@@ -41,6 +42,11 @@ enum AnalysisStatus {
 enum IndexStatus {
   INDEXED
   FAILED
+}
+
+enum ChatMessageRole {
+  USER
+  ASSISTANT
 }
 
 model Document {
@@ -62,6 +68,7 @@ model Document {
   analysis     DocumentAnalysis?
   index        DocumentIndex?
   chunks       DocumentChunk[]
+  chatSessions ChatSession[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 }
@@ -120,4 +127,36 @@ model DocumentIndex {
   errorMessage String?
   indexedAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+}
+
+model ChatSession {
+  id         String        @id @default(uuid())
+  documentId String
+  document   Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  ownerId    String
+  owner      User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title      String        @default("Nueva conversación")
+  messages   ChatMessage[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([documentId])
+  @@index([ownerId])
+}
+
+model ChatMessage {
+  id               String          @id @default(uuid())
+  sessionId        String
+  session          ChatSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role             ChatMessageRole
+  content          String
+  citations        Json?
+  model            String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  errorMessage     String?
+  createdAt        DateTime        @default(now())
+
+  @@index([sessionId, createdAt])
 }

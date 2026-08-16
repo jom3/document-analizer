@@ -8,6 +8,6 @@ import { SearchService } from './search.service.js';
   imports: [AiModule],
   controllers: [SearchController],
   providers: [DocumentIndexService, SearchService],
-  exports: [DocumentIndexService],
+  exports: [DocumentIndexService, SearchService],
 })
 export class SearchModule {}
