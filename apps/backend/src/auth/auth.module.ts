@@ -11,6 +11,11 @@ import { RefreshTokenStrategy } from './strategies/refresh-token.strategy.js';
 @Module({
   imports: [JwtModule.register({}), PassportModule, MailModule],
   controllers: [AuthController],
-  providers: [AuthService, AccessTokenStrategy, RefreshTokenStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    AccessTokenStrategy,
+    RefreshTokenStrategy,
+    JwtAuthGuard,
+  ],
 })
 export class AuthModule {}

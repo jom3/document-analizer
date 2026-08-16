@@ -35,14 +35,20 @@ export class AuthService {
   private signAccessToken(userId: string, email: string): Promise<string> {
     return this.jwt.signAsync(
       { sub: userId, email },
-      { secret: requireEnv('JWT_ACCESS_SECRET'), expiresIn: this.ttl('JWT_ACCESS_TTL') },
+      {
+        secret: requireEnv('JWT_ACCESS_SECRET'),
+        expiresIn: this.ttl('JWT_ACCESS_TTL'),
+      },
     );
   }
 
   private signRefreshToken(userId: string): Promise<string> {
     return this.jwt.signAsync(
       { sub: userId, jti: randomBytes(16).toString('hex') },
-      { secret: requireEnv('JWT_REFRESH_SECRET'), expiresIn: this.ttl('JWT_REFRESH_TTL') },
+      {
+        secret: requireEnv('JWT_REFRESH_SECRET'),
+        expiresIn: this.ttl('JWT_REFRESH_TTL'),
+      },
     );
   }
 
@@ -68,20 +74,34 @@ export class AuthService {
 
     await this.mail.sendVerificationEmail(email, verificationToken);
 
-    return { id: user.id, email: user.email, emailVerified: user.emailVerified };
+    return {
+      id: user.id,
+      email: user.email,
+      emailVerified: user.emailVerified,
+    };
   }
 
   async verifyEmail(token: string): Promise<void> {
     const hash = this.hashToken(token);
-    const user = await this.prisma.user.findUnique({ where: { emailVerificationToken: hash } });
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerificationToken: hash },
+    });
 
-    if (!user || !user.emailVerificationTokenExpires || user.emailVerificationTokenExpires < new Date()) {
+    if (
+      !user ||
+      !user.emailVerificationTokenExpires ||
+      user.emailVerificationTokenExpires < new Date()
+    ) {
       throw new BadRequestException('Invalid or expired verification token');
     }
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { emailVerified: true, emailVerificationToken: null, emailVerificationTokenExpires: null },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpires: null,
+      },
     });
   }
 
@@ -120,16 +140,26 @@ export class AuthService {
 
   async resetPassword(token: string, password: string): Promise<void> {
     const hash = this.hashToken(token);
-    const user = await this.prisma.user.findUnique({ where: { passwordResetToken: hash } });
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: hash },
+    });
 
-    if (!user || !user.passwordResetTokenExpires || user.passwordResetTokenExpires < new Date()) {
+    if (
+      !user ||
+      !user.passwordResetTokenExpires ||
+      user.passwordResetTokenExpires < new Date()
+    ) {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash, passwordResetToken: null, passwordResetTokenExpires: null },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetTokenExpires: null,
+      },
     });
   }
 
