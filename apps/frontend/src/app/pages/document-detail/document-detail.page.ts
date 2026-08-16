@@ -32,9 +32,9 @@ import {
       <div class="detail-layout">
         <div class="viewer-pane">
           <div class="view-tabs">
-            <button type="button" [class.active]="viewMode() === 'pdf'" (click)="viewMode.set('pdf')">Ver PDF</button>
-            <button type="button" [class.active]="viewMode() === 'text'" (click)="viewMode.set('text')">Texto extraído</button>
-            <button type="button" [class.active]="viewMode() === 'chat'" (click)="viewMode.set('chat')">Chat</button>
+            <button type="button" [class.active]="viewMode() === 'pdf'" (click)="switchView('pdf')">Ver PDF</button>
+            <button type="button" [class.active]="viewMode() === 'text'" (click)="switchView('text')">Texto extraído</button>
+            <button type="button" [class.active]="viewMode() === 'chat'" (click)="switchView('chat')">Chat</button>
           </div>
 
           @if (viewMode() === 'pdf') {
@@ -44,7 +44,7 @@ import {
               } @else if (pdfError()) {
                 <p class="error">{{ pdfError() }}</p>
               } @else {
-                <app-pdf-viewer [pdfBlob]="pdfBlob()" (downloadRequested)="download()" />
+                <app-pdf-viewer [pdfBlob]="pdfBlob()" [navigateTo]="pdfNavigateTarget()" (downloadRequested)="download()" />
               }
             </div>
           } @else if (viewMode() === 'text') {
@@ -64,7 +64,7 @@ import {
           } @else {
             @if (document()) {
               <div class="chat-host">
-                <app-document-chat [documentId]="document()!.id" />
+                <app-document-chat [documentId]="document()!.id" (sourceSelected)="onSourceSelected($event)" />
               </div>
             }
           }
@@ -389,6 +389,7 @@ export class DocumentDetailPage implements OnInit {
   readonly pdfBlob = signal<Blob | null>(null);
   readonly pdfLoading = signal(false);
   readonly pdfError = signal<string | null>(null);
+  readonly pdfNavigateTarget = signal<{ pageNumber: number; text: string } | null>(null);
   readonly viewMode = signal<'pdf' | 'text' | 'chat'>('pdf');
 
   ngOnInit(): void {
@@ -442,6 +443,16 @@ export class DocumentDetailPage implements OnInit {
         URL.revokeObjectURL(url);
       },
     });
+  }
+
+  switchView(mode: 'pdf' | 'text' | 'chat'): void {
+    this.viewMode.set(mode);
+    this.pdfNavigateTarget.set(null);
+  }
+
+  onSourceSelected(target: { pageNumber: number; text: string }): void {
+    this.pdfNavigateTarget.set(target);
+    this.viewMode.set('pdf');
   }
 
   private loadPdf(document: Document): void {
