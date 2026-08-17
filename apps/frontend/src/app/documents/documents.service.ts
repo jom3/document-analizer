@@ -2,6 +2,16 @@ import { HttpClient, HttpDownloadProgressEvent, HttpEventType } from '@angular/c
 import { Injectable, inject } from '@angular/core';
 import { concatMap, filter, map, Observable } from 'rxjs';
 
+export interface DocumentJob {
+  jobId: string;
+  status: string;
+  attempts: number;
+  failReason: string | null;
+  logs: unknown[] | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 export interface Document {
   id: string;
   name: string;
@@ -14,6 +24,7 @@ export interface Document {
   title: string | null;
   author: string | null;
   errorMessage: string | null;
+  job?: DocumentJob | null;
   createdAt: string;
 }
 
