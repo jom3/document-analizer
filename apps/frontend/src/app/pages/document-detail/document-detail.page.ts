@@ -79,6 +79,13 @@ import {
                 <dt>Tamaño</dt><dd>{{ formatSize(document()!.size) }}</dd>
                 <dt>Páginas</dt><dd>{{ document()!.pageCount ?? '—' }}</dd>
                 <dt>Estado</dt><dd>{{ statusLabel(document()!.status) }}</dd>
+                @if (document()!.job; as job) {
+                  <dt>Procesamiento</dt>
+                  <dd>{{ jobStatusLabel(job.status) }} · intento {{ job.attempts }}</dd>
+                  @if (job.failReason) {
+                    <dd class="error">{{ job.failReason }}</dd>
+                  }
+                }
                 <dt>Subido</dt><dd>{{ formatDate(document()!.createdAt) }}</dd>
               </dl>
               @if (document()!.status === 'FAILED' && document()!.errorMessage) {
@@ -181,6 +188,11 @@ import {
     .detail .status.processing {
       background: #fff4e5;
       color: #8a5300;
+    }
+
+    .detail .status.queued {
+      background: #e8f0fe;
+      color: #1a73e8;
     }
 
     .detail .error {
@@ -562,7 +574,24 @@ export class DocumentDetailPage implements OnInit {
     switch (status) {
       case 'UPLOADED':
         return 'Subido';
+      case 'QUEUED':
+        return 'En cola';
       case 'PROCESSING':
+        return 'Procesando';
+      case 'COMPLETED':
+        return 'Completado';
+      case 'FAILED':
+        return 'Fallido';
+      default:
+        return status;
+    }
+  }
+
+  jobStatusLabel(status: string): string {
+    switch (status) {
+      case 'QUEUED':
+        return 'En cola';
+      case 'ACTIVE':
         return 'Procesando';
       case 'COMPLETED':
         return 'Completado';

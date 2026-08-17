@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Document, DocumentsService, SearchResultItem } from '../../documents/documents.service';
 
@@ -291,13 +291,18 @@ const LIMIT = 10;
       color: #8a5300;
     }
 
+    .documents .status.queued {
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+
     .documents .success {
       color: #0b6e0b;
       font-size: 0.875rem;
     }
   `,
 })
-export class DocumentsPage implements OnInit {
+export class DocumentsPage implements OnInit, OnDestroy {
   private readonly documentsService = inject(DocumentsService);
 
   readonly documents = signal<Document[]>([]);
@@ -327,8 +332,26 @@ export class DocumentsPage implements OnInit {
     return true;
   });
 
+  private pollingTimer?: ReturnType<typeof setInterval>;
+
   ngOnInit(): void {
     this.load();
+    this.pollingTimer = setInterval(() => this.poll(), 3000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.pollingTimer) {
+      clearInterval(this.pollingTimer);
+    }
+  }
+
+  private poll(): void {
+    const pending = this.documents().some(
+      (doc) => doc.status === 'QUEUED' || doc.status === 'PROCESSING',
+    );
+    if (pending) {
+      this.load();
+    }
   }
 
   load(): void {
@@ -461,6 +484,8 @@ export class DocumentsPage implements OnInit {
     switch (status) {
       case 'UPLOADED':
         return 'Subido';
+      case 'QUEUED':
+        return 'En cola';
       case 'PROCESSING':
         return 'Procesando';
       case 'COMPLETED':
