@@ -22,6 +22,64 @@ interface CreateDocumentInput {
   keepOriginalName: boolean;
 }
 
+export interface DocumentStats {
+  total: number;
+  processed: number;
+  processing: number;
+  failed: number;
+  byType: Array<{ type: string; count: number }>;
+  activity: Array<{ weekStart: string; count: number }>;
+  recent: Array<{
+    id: string;
+    name: string;
+    originalName: string;
+    status: string;
+    documentType: string | null;
+    createdAt: string;
+  }>;
+}
+
+const STATS_WEEKS = 12;
+const DOCUMENT_TYPES = ['invoice', 'resume', 'contract', 'generic'] as const;
+const UNCLASSIFIED_TYPE = 'unclassified';
+
+function startOfWeek(date: Date): Date {
+  const result = new Date(date);
+  const daysSinceMonday =
+    result.getUTCDay() === 0 ? -6 : 1 - result.getUTCDay();
+  result.setUTCDate(result.getUTCDate() + daysSinceMonday);
+  result.setUTCHours(0, 0, 0, 0);
+  return result;
+}
+
+function formatWeek(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function countOf(value: unknown): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (value && typeof value === 'object' && '_all' in value) {
+    const total = (value as { _all: unknown })._all;
+    if (typeof total === 'number') {
+      return total;
+    }
+  }
+  return 0;
+}
+
+function lastWeekStarts(count: number): Date[] {
+  const current = startOfWeek(new Date());
+  const starts: Date[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const week = new Date(current);
+    week.setUTCDate(week.getUTCDate() - i * 7);
+    starts.push(week);
+  }
+  return starts;
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -107,6 +165,93 @@ export class DocumentsService {
       this.prisma.document.count({ where }),
     ]);
     return { data, total, page, limit };
+  }
+
+  async stats(ownerId: string): Promise<DocumentStats> {
+    const weeks = lastWeekStarts(STATS_WEEKS);
+
+    const [statusGroups, typeGroups, activityDocs, recentDocs] =
+      await this.prisma.$transaction([
+        this.prisma.document.groupBy({
+          by: ['status'],
+          where: { ownerId },
+          orderBy: { status: 'asc' },
+          _count: true,
+        }),
+        this.prisma.documentAnalysis.groupBy({
+          by: ['documentType'],
+          where: { document: { ownerId } },
+          orderBy: { documentType: 'asc' },
+          _count: true,
+        }),
+        this.prisma.document.findMany({
+          where: { ownerId, createdAt: { gte: weeks[0] } },
+          select: { createdAt: true },
+        }),
+        this.prisma.document.findMany({
+          where: { ownerId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          include: { analysis: { select: { documentType: true } } },
+        }),
+      ]);
+
+    const statusCounts = new Map<string, number>();
+    for (const group of statusGroups) {
+      statusCounts.set(group.status, countOf(group._count));
+    }
+
+    const total = [...statusCounts.values()].reduce(
+      (sum, count) => sum + count,
+      0,
+    );
+    const processed = statusCounts.get(DocumentStatus.COMPLETED) ?? 0;
+    const processing =
+      (statusCounts.get(DocumentStatus.UPLOADED) ?? 0) +
+      (statusCounts.get(DocumentStatus.QUEUED) ?? 0) +
+      (statusCounts.get(DocumentStatus.PROCESSING) ?? 0);
+    const failed = statusCounts.get(DocumentStatus.FAILED) ?? 0;
+
+    const typeCounts = new Map<string, number>();
+    for (const group of typeGroups) {
+      if (group.documentType) {
+        typeCounts.set(group.documentType, countOf(group._count));
+      }
+    }
+    const byType: Array<{ type: string; count: number }> = DOCUMENT_TYPES.map(
+      (type) => ({ type, count: typeCounts.get(type) ?? 0 }),
+    );
+    const classifiedTotal = byType.reduce((sum, entry) => sum + entry.count, 0);
+    byType.push({
+      type: UNCLASSIFIED_TYPE,
+      count: total - classifiedTotal,
+    });
+
+    const weekCounts = new Map<string, number>();
+    for (const week of weeks) {
+      weekCounts.set(formatWeek(week), 0);
+    }
+    for (const doc of activityDocs) {
+      const key = formatWeek(startOfWeek(doc.createdAt));
+      if (weekCounts.has(key)) {
+        weekCounts.set(key, (weekCounts.get(key) ?? 0) + 1);
+      }
+    }
+    const activity = weeks.map((week) => {
+      const weekStart = formatWeek(week);
+      return { weekStart, count: weekCounts.get(weekStart) ?? 0 };
+    });
+
+    const recent = recentDocs.map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      originalName: doc.originalName,
+      status: doc.status,
+      documentType: doc.analysis?.documentType ?? null,
+      createdAt: doc.createdAt.toISOString(),
+    }));
+
+    return { total, processed, processing, failed, byType, activity, recent };
   }
 
   async findOne(ownerId: string, id: string) {
