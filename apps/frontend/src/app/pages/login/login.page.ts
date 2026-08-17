@@ -29,7 +29,7 @@ import { AuthService } from '../../auth/auth.service';
           <p class="error">{{ error() }}</p>
         }
 
-        <button type="submit" [disabled]="form.invalid || submitting()">Entrar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="form.invalid || submitting()">Entrar</button>
       </form>
 
       <nav>
