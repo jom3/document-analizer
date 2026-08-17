@@ -102,6 +102,23 @@ export interface DocumentList {
   limit: number;
 }
 
+export interface DocumentStats {
+  total: number;
+  processed: number;
+  processing: number;
+  failed: number;
+  byType: Array<{ type: string; count: number }>;
+  activity: Array<{ weekStart: string; count: number }>;
+  recent: Array<{
+    id: string;
+    name: string;
+    originalName: string;
+    status: string;
+    documentType: string | null;
+    createdAt: string;
+  }>;
+}
+
 export interface SearchResultItem {
   chunkId: string;
   documentId: string;
@@ -156,6 +173,10 @@ export class DocumentsService {
 
   getOne(id: string): Observable<Document> {
     return this.http.get<Document>(`/api/documents/${id}`);
+  }
+
+  stats(): Observable<DocumentStats> {
+    return this.http.get<DocumentStats>('/api/documents/stats');
   }
 
   upload(file: File, options: { name?: string; keepOriginalName: boolean }): Observable<Document> {
