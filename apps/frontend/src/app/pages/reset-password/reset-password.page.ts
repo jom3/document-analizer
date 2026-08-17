@@ -47,7 +47,7 @@ function confirmPasswordValidator(group: AbstractControl): ValidationErrors | nu
             <p class="error">{{ error() }}</p>
           }
 
-          <button type="submit" [disabled]="form.invalid || submitting()">Restablecer</button>
+          <button type="submit" class="btn btn-primary" [disabled]="form.invalid || submitting()">Restablecer</button>
         </form>
       }
     </section>

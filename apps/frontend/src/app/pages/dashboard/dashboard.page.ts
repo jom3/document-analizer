@@ -1,23 +1,19 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../auth/auth.service';
+import { RouterLink } from '@angular/router';
+import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
+import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { DocumentStats, DocumentsService } from '../../documents/documents.service';
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [RouterLink],
+  imports: [RouterLink, StatusBadgeComponent, EmptyStateComponent],
   template: `
     <section class="dashboard">
       <header class="dashboard-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p class="welcome">Bienvenido, {{ user()?.email }}</p>
-        </div>
-        <nav class="header-actions">
-          <a routerLink="/documents">Mis documentos</a>
-          <button type="button" (click)="load()" [disabled]="loading()">Actualizar</button>
-          <button type="button" (click)="logout()">Cerrar sesión</button>
-        </nav>
+        <h1>Dashboard</h1>
+        <button type="button" class="btn btn-primary" (click)="load()" [disabled]="loading()">
+          Actualizar
+        </button>
       </header>
 
       @if (loading()) {
@@ -28,16 +24,22 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
         </div>
         <div class="card skeleton skeleton-tall"></div>
       } @else if (error()) {
-        <div class="state">
-          <p>No se pudo cargar el dashboard.</p>
-          <button type="button" (click)="load()">Reintentar</button>
-        </div>
+        <app-empty-state
+          title="No se pudo cargar el dashboard"
+          message="Revisá tu conexión e intentá de nuevo."
+          variant="error"
+          [actions]="true"
+        >
+          <button type="button" class="btn btn-primary" (click)="load()">Reintentar</button>
+        </app-empty-state>
       } @else if (stats()?.total === 0) {
-        <div class="state">
-          <h2>Sin documentos</h2>
-          <p>Subí tu primer documento para ver tus estadísticas.</p>
-          <a routerLink="/documents">Ir a Mis documentos</a>
-        </div>
+        <app-empty-state
+          title="Sin documentos"
+          message="Subí tu primer documento para ver tus estadísticas."
+          [actions]="true"
+        >
+          <a class="btn btn-primary" routerLink="/documents">Ir a Mis documentos</a>
+        </app-empty-state>
       } @else {
         <div class="kpi-grid">
           <div class="card kpi">
@@ -64,7 +66,7 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
             <a class="recent-row" routerLink="/documents/{{ doc.id }}">
               <span class="recent-name">{{ doc.name }}</span>
               <span class="recent-meta">{{ formatDate(doc.createdAt) }}</span>
-              <span class="status" [class]="statusClass(doc.status)">{{ statusLabel(doc.status) }}</span>
+              <app-status-badge [status]="doc.status" />
             </a>
           } @empty {
             <p class="empty">No hay documentos recientes</p>
@@ -78,21 +80,21 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
               <div class="bar-row">
                 <span class="bar-label">Procesados</span>
                 <div class="bar-track">
-                  <div class="bar-fill" [style.width.%]="percent(stats()!.processed, stats()!.total)"></div>
+                  <div class="bar-fill success" [style.width.%]="percent(stats()!.processed, stats()!.total)"></div>
                 </div>
                 <span class="bar-value">{{ stats()!.processed }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">En curso</span>
                 <div class="bar-track">
-                  <div class="bar-fill" [style.width.%]="percent(stats()!.processing, stats()!.total)"></div>
+                  <div class="bar-fill warning" [style.width.%]="percent(stats()!.processing, stats()!.total)"></div>
                 </div>
                 <span class="bar-value">{{ stats()!.processing }}</span>
               </div>
               <div class="bar-row">
                 <span class="bar-label">Fallidos</span>
                 <div class="bar-track">
-                  <div class="bar-fill" [style.width.%]="percent(stats()!.failed, stats()!.total)"></div>
+                  <div class="bar-fill danger" [style.width.%]="percent(stats()!.failed, stats()!.total)"></div>
                 </div>
                 <span class="bar-value">{{ stats()!.failed }}</span>
               </div>
@@ -133,103 +135,63 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
     </section>
   `,
   styles: `
-    :host {
-      display: block;
-    }
-
     .dashboard {
       max-width: 1100px;
-      margin: 6vh auto;
-      padding: 0 1rem;
+      margin: var(--space-6) auto;
+      padding: 0 var(--space-4);
     }
 
     .dashboard-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.5rem;
+      gap: var(--space-4);
+      margin-bottom: var(--space-5);
     }
 
     .dashboard-header h1 {
-      margin: 0 0 0.25rem;
-    }
-
-    .welcome {
       margin: 0;
-      font-size: 0.9rem;
-      color: #555;
     }
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .header-actions a {
-      font-size: 0.875rem;
-      color: #1a73e8;
-      text-decoration: none;
-    }
-
-    .dashboard button {
-      padding: 0.5rem 0.75rem;
-      border: none;
-      border-radius: 6px;
-      background: #1a73e8;
-      color: #fff;
-      font-size: 0.875rem;
-      cursor: pointer;
-    }
-
-    .dashboard button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .card h2 {
-      margin: 0 0 1rem;
-      font-size: 1rem;
+    .dashboard .card {
+      margin-bottom: var(--space-4);
     }
 
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 1rem;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .kpi-grid .card {
+      margin-bottom: 0;
     }
 
     .kpi {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: var(--space-1);
     }
 
     .kpi-label {
-      font-size: 0.75rem;
-      color: #777;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
     }
 
     .kpi-value {
-      font-size: 1.75rem;
-      font-weight: 600;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xl);
+      font-weight: var(--weight-semibold);
     }
 
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-      margin-bottom: 1rem;
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
     }
 
     .stats-grid .card {
@@ -238,8 +200,13 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
 
     .skeleton {
       min-height: 90px;
-      border: 1px solid #eee;
-      background: linear-gradient(90deg, #eee 25%, #f6f6f6 50%, #eee 75%);
+      border: 1px solid var(--color-border);
+      background: linear-gradient(
+        90deg,
+        var(--color-surface-muted) 25%,
+        var(--color-surface) 50%,
+        var(--color-surface-muted) 75%
+      );
       background-size: 200% 100%;
       animation: shimmer 1.4s infinite;
     }
@@ -257,46 +224,26 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
       }
     }
 
-    .state {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 2rem;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-
-    .state h2 {
-      margin: 0 0 0.5rem;
-    }
-
-    .state p {
-      margin: 0 0 1rem;
-      color: #555;
-    }
-
-    .state a {
-      color: #1a73e8;
-      text-decoration: none;
-    }
-
     .recent-row {
       display: grid;
       grid-template-columns: 1fr auto auto;
       align-items: center;
-      gap: 0.75rem;
+      gap: var(--space-3);
       padding: 0.6rem 0;
-      border-bottom: 1px solid #eee;
-      text-decoration: none;
-      color: #1a1a1a;
+      border-bottom: 1px solid var(--color-border);
+      color: var(--color-text);
     }
 
     .recent-row:last-child {
       border-bottom: none;
     }
 
+    .recent-row:hover {
+      background: var(--color-surface-muted);
+    }
+
     .recent-name {
-      font-size: 0.9rem;
+      font-size: var(--text-sm);
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -304,38 +251,8 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
     }
 
     .recent-meta {
-      font-size: 0.75rem;
-      color: #777;
-    }
-
-    .status {
-      display: inline-block;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      background: #e8eaed;
-      color: #444;
-    }
-
-    .status.completed {
-      background: #e0f2e1;
-      color: #0b6e0b;
-    }
-
-    .status.failed {
-      background: #fdecea;
-      color: #b00020;
-    }
-
-    .status.processing {
-      background: #fff4e5;
-      color: #8a5300;
-    }
-
-    .status.queued {
-      background: #e8f0fe;
-      color: #1a73e8;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
     }
 
     .bar-list {
@@ -348,37 +265,50 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
       display: grid;
       grid-template-columns: 110px 1fr 2rem;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2);
     }
 
     .bar-label {
-      font-size: 0.8rem;
-      color: #444;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
     }
 
     .bar-track {
       height: 0.6rem;
-      background: #eef0f2;
-      border-radius: 999px;
+      background: var(--color-surface-muted);
+      border-radius: var(--radius-full);
       overflow: hidden;
     }
 
     .bar-fill {
       height: 100%;
-      background: #1a73e8;
-      border-radius: 999px;
+      background: var(--color-primary);
+      border-radius: var(--radius-full);
+    }
+
+    .bar-fill.success {
+      background: var(--color-success);
+    }
+
+    .bar-fill.warning {
+      background: var(--color-warning);
+    }
+
+    .bar-fill.danger {
+      background: var(--color-danger);
     }
 
     .bar-value {
-      font-size: 0.8rem;
-      color: #555;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
       text-align: right;
     }
 
     .activity-chart {
       display: flex;
       align-items: flex-end;
-      gap: 0.5rem;
+      gap: var(--space-2);
     }
 
     .activity-col {
@@ -399,25 +329,26 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
     .activity-bar {
       width: 70%;
       max-width: 2.5rem;
-      background: #1a73e8;
+      background: var(--color-primary);
       border-radius: 4px 4px 0 0;
       min-height: 2px;
     }
 
     .activity-value {
-      font-size: 0.7rem;
-      color: #555;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
     }
 
     .activity-label {
-      font-size: 0.65rem;
-      color: #777;
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
     }
 
     .empty {
       margin: 0;
-      color: #777;
-      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
     }
 
     @media (max-width: 720px) {
@@ -434,20 +365,13 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
   `,
 })
 export class DashboardPage implements OnInit {
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
   private readonly documents = inject(DocumentsService);
-
-  readonly user = this.auth.user;
 
   readonly stats = signal<DocumentStats | null>(null);
   readonly loading = signal(true);
   readonly error = signal(false);
 
   ngOnInit(): void {
-    this.auth.me().subscribe({
-      error: () => undefined,
-    });
     this.load();
   }
 
@@ -466,13 +390,6 @@ export class DashboardPage implements OnInit {
     });
   }
 
-  logout(): void {
-    this.auth.logout().subscribe({
-      next: () => this.router.navigate(['/login']),
-      error: () => this.router.navigate(['/login']),
-    });
-  }
-
   percent(count: number, total: number): number {
     return total > 0 ? Math.round((count / total) * 100) : 0;
   }
@@ -481,27 +398,6 @@ export class DashboardPage implements OnInit {
     const activity = this.stats()?.activity ?? [];
     const max = activity.reduce((acc, week) => Math.max(acc, week.count), 1);
     return Math.round((count / max) * 100);
-  }
-
-  statusLabel(status: string): string {
-    switch (status) {
-      case 'UPLOADED':
-        return 'Subido';
-      case 'QUEUED':
-        return 'En cola';
-      case 'PROCESSING':
-        return 'Procesando';
-      case 'COMPLETED':
-        return 'Completado';
-      case 'FAILED':
-        return 'Fallido';
-      default:
-        return status;
-    }
-  }
-
-  statusClass(status: string): string {
-    return status.toLowerCase();
   }
 
   typeLabel(type: string): string {

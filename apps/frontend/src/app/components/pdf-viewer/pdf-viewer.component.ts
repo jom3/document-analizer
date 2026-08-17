@@ -63,6 +63,11 @@ interface PdfTextItem {
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      height: 100%;
+    }
+
     .pdf-viewer {
       display: flex;
       flex-direction: column;
@@ -75,17 +80,18 @@ interface PdfTextItem {
       align-items: center;
       gap: 0.5rem;
       padding: 0.5rem;
-      background: #fff;
-      border-bottom: 1px solid #ddd;
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
     }
 
     .toolbar-btn {
       padding: 0.25rem 0.75rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      background: #fff;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      color: var(--color-text);
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: var(--text-sm);
     }
 
     .toolbar-btn:disabled {
@@ -93,28 +99,34 @@ interface PdfTextItem {
       cursor: default;
     }
 
+    .toolbar-btn:hover:not(:disabled) {
+      background: var(--color-surface-muted);
+    }
+
     .page-indicator {
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
-      font-size: 0.875rem;
-      color: #555;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
     }
 
     .page-input {
       width: 3.5rem;
       padding: 0.25rem 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 0.875rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-size: var(--text-sm);
       text-align: center;
     }
 
     .zoom-level {
       min-width: 3rem;
       text-align: center;
-      font-size: 0.875rem;
-      color: #555;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
     }
 
     .separator {
@@ -128,12 +140,12 @@ interface PdfTextItem {
       justify-content: center;
       align-items: flex-start;
       padding: 1rem;
-      background: #f2f2f2;
+      background: var(--color-surface-muted);
     }
 
     .canvas-container canvas {
-      box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
-      background: #fff;
+      box-shadow: var(--shadow-md);
+      background: var(--color-surface);
     }
 
     .pdf-frame {
@@ -150,18 +162,18 @@ interface PdfTextItem {
 
     .pdf-overlay .highlight {
       position: absolute;
-      background: rgb(255 213 79 / 45%);
+      background: var(--color-highlight-soft);
       border-radius: 2px;
     }
 
     .viewer-state {
       margin: auto;
-      color: #777;
-      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
     }
 
     .viewer-state.error {
-      color: #b00020;
+      color: var(--color-danger);
     }
   `,
 })

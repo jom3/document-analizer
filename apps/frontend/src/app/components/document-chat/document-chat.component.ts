@@ -119,6 +119,11 @@ import {
     }
   `,
   styles: `
+    :host {
+      display: block;
+      height: 100%;
+    }
+
     .chat-layout {
       display: flex;
       gap: 1rem;
@@ -128,8 +133,9 @@ import {
     .sessions {
       width: 220px;
       flex-shrink: 0;
-      border: 1px solid #ddd;
-      border-radius: 10px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface);
       padding: 0.75rem;
       display: flex;
       flex-direction: column;
@@ -140,12 +146,16 @@ import {
 
     .sessions .new {
       padding: 0.4rem 0.75rem;
-      border: 1px solid #1a73e8;
-      border-radius: 999px;
-      background: #e8f0fe;
-      color: #1a73e8;
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius-full);
+      background: transparent;
+      color: var(--color-primary);
       cursor: pointer;
-      font-size: 0.8125rem;
+      font-size: var(--text-sm);
+    }
+
+    .sessions .new:hover {
+      background: var(--color-surface-muted);
     }
 
     .sessions .session {
@@ -157,7 +167,7 @@ import {
     }
 
     .sessions .session.active {
-      background: #e8f0fe;
+      background: var(--color-surface-muted);
     }
 
     .sessions .session .title {
@@ -178,16 +188,16 @@ import {
       background: none;
       cursor: pointer;
       font-size: 0.75rem;
-      color: #777;
+      color: var(--color-text-muted);
       padding: 0.15rem 0.25rem;
     }
 
     .sessions .session input {
       flex: 1;
       min-width: 0;
-      font-size: 0.8125rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      font-size: var(--text-sm);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
       padding: 0.25rem;
     }
 
@@ -223,39 +233,40 @@ import {
       margin: 0;
       padding: 0.6rem 0.85rem;
       border-radius: 12px;
-      background: #f1f3f4;
-      font-size: 0.875rem;
-      line-height: 1.5;
+      background: var(--color-surface-muted);
+      color: var(--color-text);
+      font-size: var(--text-sm);
+      line-height: var(--leading-base);
       white-space: pre-wrap;
       word-wrap: break-word;
     }
 
     .message.user .bubble {
-      background: #1a73e8;
-      color: #fff;
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
     }
 
     .sources {
       margin-top: 0.35rem;
       font-size: 0.75rem;
-      color: #555;
+      color: var(--color-text-muted);
       max-width: 80%;
     }
 
     .sources summary {
       cursor: pointer;
-      color: #1a73e8;
+      color: var(--color-primary);
     }
 
     .source {
       display: block;
       margin: 0.25rem 0;
       padding: 0.35rem 0.5rem;
-      border: 1px solid #e0e0e0;
-      border-left: 2px solid #1a73e8;
-      border-radius: 6px;
-      background: #fafafa;
-      color: #333;
+      border: 1px solid var(--color-border);
+      border-left: 2px solid var(--color-primary);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface);
+      color: var(--color-text);
       text-align: left;
       font-size: inherit;
       cursor: pointer;
@@ -264,7 +275,7 @@ import {
     }
 
     .source:hover {
-      background: #eef4fd;
+      background: var(--color-surface-muted);
     }
 
     .composer {
@@ -275,19 +286,19 @@ import {
     .composer input {
       flex: 1;
       padding: 0.5rem 0.75rem;
-      border: 1px solid #ccc;
-      border-radius: 999px;
-      font-size: 0.875rem;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      font-size: var(--text-sm);
     }
 
     .composer button {
       padding: 0.5rem 1.25rem;
       border: none;
-      border-radius: 999px;
-      background: #1a73e8;
-      color: #fff;
+      border-radius: var(--radius-full);
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: var(--text-sm);
     }
 
     .composer button:disabled {
@@ -296,20 +307,20 @@ import {
     }
 
     .empty {
-      color: #777;
-      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
     }
 
     .error {
-      color: #b00020;
-      font-size: 0.8125rem;
+      color: var(--color-danger);
+      font-size: var(--text-sm);
       margin: 0.25rem 0 0;
     }
 
     .no-index {
-      border: 1px solid #fdecea;
-      background: #fdecea;
-      border-radius: 10px;
+      border: 1px solid var(--color-status-failed-bg);
+      background: var(--color-status-failed-bg);
+      border-radius: var(--radius-lg);
       padding: 1rem;
       display: flex;
       flex-direction: column;
@@ -318,18 +329,18 @@ import {
 
     .no-index .warn {
       margin: 0;
-      color: #8a5300;
+      color: var(--color-warning);
     }
 
     .no-index button {
       align-self: flex-start;
       padding: 0.4rem 1rem;
-      border: 1px solid #8a5300;
-      border-radius: 999px;
-      background: #fff;
-      color: #8a5300;
+      border: 1px solid var(--color-warning);
+      border-radius: var(--radius-full);
+      background: var(--color-surface);
+      color: var(--color-warning);
       cursor: pointer;
-      font-size: 0.8125rem;
+      font-size: var(--text-sm);
     }
   `,
 })

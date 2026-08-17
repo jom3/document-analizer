@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { AppLayoutComponent } from './components/app-layout/app-layout.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
 import { DashboardPage } from './pages/dashboard/dashboard.page';
@@ -15,16 +16,21 @@ export const routes: Routes = [
   { path: 'verify-email', component: VerifyEmailPage },
   { path: 'forgot-password', component: ForgotPasswordPage },
   { path: 'reset-password', component: ResetPasswordPage },
-  { path: 'dashboard', component: DashboardPage, canActivate: [authGuard] },
   {
-    path: 'documents',
+    path: '',
+    component: AppLayoutComponent,
     canActivate: [authGuard],
-    loadComponent: () => import('./pages/documents/documents.page').then((m) => m.DocumentsPage),
-  },
-  {
-    path: 'documents/:id',
-    canActivate: [authGuard],
-    loadComponent: () => import('./pages/document-detail/document-detail.page').then((m) => m.DocumentDetailPage),
+    children: [
+      { path: 'dashboard', component: DashboardPage },
+      {
+        path: 'documents',
+        loadComponent: () => import('./pages/documents/documents.page').then((m) => m.DocumentsPage),
+      },
+      {
+        path: 'documents/:id',
+        loadComponent: () => import('./pages/document-detail/document-detail.page').then((m) => m.DocumentDetailPage),
+      },
+    ],
   },
   { path: '**', redirectTo: 'dashboard' },
 ];
