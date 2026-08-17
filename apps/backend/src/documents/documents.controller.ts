@@ -64,6 +64,11 @@ export class DocumentsController {
     return this.documents.findAll(this.ownerId(req), pageNumber, pageSize);
   }
 
+  @Get('stats')
+  async stats(@Req() req: Request) {
+    return this.documents.stats(this.ownerId(req));
+  }
+
   @Get(':id')
   async findOne(@Req() req: Request, @Param('id') id: string) {
     return this.documents.findOne(this.ownerId(req), id);
