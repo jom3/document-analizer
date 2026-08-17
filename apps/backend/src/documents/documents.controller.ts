@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Post,
   Query,
@@ -30,6 +31,7 @@ export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
   @Post()
+  @HttpCode(202)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: multer.memoryStorage(),
@@ -96,6 +98,7 @@ export class DocumentsController {
   }
 
   @Post(':id/reindex')
+  @HttpCode(202)
   async reindex(@Req() req: Request, @Param('id') id: string) {
     return this.documents.reindex(this.ownerId(req), id);
   }

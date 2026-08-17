@@ -29,7 +29,15 @@ model User {
 
 enum DocumentStatus {
   UPLOADED
+  QUEUED
   PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  ACTIVE
   COMPLETED
   FAILED
 }
@@ -69,8 +77,24 @@ model Document {
   index        DocumentIndex?
   chunks       DocumentChunk[]
   chatSessions ChatSession[]
+  job          DocumentJob?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+}
+
+model DocumentJob {
+  id         String    @id @default(uuid())
+  documentId String    @unique
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  jobId      String    @unique
+  status     JobStatus @default(QUEUED)
+  attempts   Int       @default(0)
+  failReason String?
+  logs       Json?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model DocumentPage {

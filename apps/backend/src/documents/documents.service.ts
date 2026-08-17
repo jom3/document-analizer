@@ -8,10 +8,8 @@ import { createReadStream } from 'node:fs';
 import { access, mkdir, open, unlink, writeFile } from 'node:fs/promises';
 import { extname, join, resolve } from 'node:path';
 import { DocumentStatus } from '../../generated/prisma/enums.js';
-import { DocumentAnalysisService } from '../ai/document-analysis.service.js';
-import { DocumentIndexService } from '../search/document-index.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { DocumentProcessingService } from './document-processing.service.js';
+import { DocumentJobService } from './document-job.service.js';
 import {
   ALLOWED_MIME_TYPES,
   MAX_NAME_LENGTH,
@@ -28,9 +26,7 @@ interface CreateDocumentInput {
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly processing: DocumentProcessingService,
-    private readonly analysis: DocumentAnalysisService,
-    private readonly indexer: DocumentIndexService,
+    private readonly jobs: DocumentJobService,
   ) {}
 
   async create(ownerId: string, input: CreateDocumentInput) {
@@ -64,8 +60,8 @@ export class DocumentsService {
       throw new BadRequestException('Tipo de archivo no permitido');
     }
 
-    try {
-      const document = await this.prisma.document.create({
+    const document = await this.prisma.document
+      .create({
         data: {
           name: documentName,
           originalName: file.originalname,
@@ -74,36 +70,29 @@ export class DocumentsService {
           size: file.size,
           storageKey,
           ownerId,
+          status: DocumentStatus.QUEUED,
         },
+      })
+      .catch(async (error) => {
+        await unlink(fullPath).catch(() => undefined);
+        throw error;
       });
-      await this.process(document);
-      return this.prisma.document.findUniqueOrThrow({
-        where: { id: document.id },
-      });
-    } catch (error) {
-      await unlink(fullPath).catch(() => undefined);
-      throw error;
-    }
-  }
 
-  private async process(document: { id: string }): Promise<void> {
     try {
-      await this.processing.processDocument(document.id);
-      await this.analysis.analyze(document.id);
+      await this.jobs.enqueueProcess(document.id);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Error desconocido';
       await this.prisma.document.update({
         where: { id: document.id },
-        data: {
-          status: DocumentStatus.FAILED,
-          errorMessage: message,
-        },
+        data: { status: DocumentStatus.FAILED, errorMessage: message },
       });
-      return;
+      throw error;
     }
 
-    await this.indexer.indexDocument(document.id);
+    return this.prisma.document.findUniqueOrThrow({
+      where: { id: document.id },
+    });
   }
 
   async findAll(ownerId: string, page: number, limit: number) {
@@ -123,6 +112,7 @@ export class DocumentsService {
   async findOne(ownerId: string, id: string) {
     const document = await this.prisma.document.findFirst({
       where: { id, ownerId },
+      include: { job: true },
     });
     if (!document) {
       throw new NotFoundException('Documento no encontrado');
@@ -163,9 +153,8 @@ export class DocumentsService {
 
   async reindex(ownerId: string, id: string) {
     await this.findOne(ownerId, id);
-    await this.indexer.deleteChunks(id);
-    await this.indexer.indexDocument(id);
-    return { message: 'Documento reindexado' };
+    await this.jobs.enqueueReindex(id);
+    return { message: 'Documento en cola para reindexar' };
   }
 
   async remove(ownerId: string, id: string) {

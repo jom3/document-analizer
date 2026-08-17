@@ -12,5 +12,15 @@ services:
       - document-analyzer-db-data:/var/lib/postgresql
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: document-analyzer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - document-analyzer-redis-data:/data
+    restart: unless-stopped
+
 volumes:
   document-analyzer-db-data:
+  document-analyzer-redis-data:

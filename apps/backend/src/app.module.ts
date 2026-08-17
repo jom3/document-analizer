@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
@@ -9,6 +10,9 @@ import { ChatModule } from './chat/chat.module.js';
 
 @Module({
   imports: [
+    BullModule.forRoot({
+      connection: { url: process.env.REDIS_URL ?? 'redis://localhost:6379' },
+    }),
     PrismaModule,
     HealthModule,
     AuthModule,
