@@ -1,22 +1,57 @@
 import { Component, ElementRef, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
+import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { Document, DocumentsService, SearchResultItem } from '../../documents/documents.service';
 
 const LIMIT = 10;
 
 @Component({
   selector: 'app-documents-page',
-  imports: [RouterLink],
+  imports: [RouterLink, StatusBadgeComponent, EmptyStateComponent],
   template: `
     <section class="page documents">
-      <a routerLink="/dashboard" class="back">← Volver</a>
       <h1>Mis documentos</h1>
 
-      <div class="upload">
-        <label>
-          Archivo
-          <input #fileInput type="file" (change)="onFileChange($event)" accept=".pdf,application/pdf" />
-        </label>
+      <div class="card upload">
+        <div
+          class="file-picker"
+          [class.is-dragging]="dragging()"
+          role="button"
+          tabindex="0"
+          (click)="openFilePicker()"
+          (keydown.enter)="openFilePicker()"
+          (keydown.space)="openFilePicker()"
+          (dragenter)="onDragEnter($event)"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+        >
+          <input
+            #fileInput
+            type="file"
+            class="file-input"
+            (change)="onFileChange($event)"
+            accept=".pdf,application/pdf"
+          />
+
+          @if (selectedFile()) {
+            <div class="file-info">
+              <span class="file-name">{{ selectedFile()!.name }}</span>
+              <span class="file-size">{{ formatSize(selectedFile()!.size) }}</span>
+              <button type="button" class="btn btn-ghost file-clear" (click)="clearFile($event)">Quitar</button>
+            </div>
+          } @else {
+            <div class="file-placeholder">
+              <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="4" />
+                <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <strong>Elegí un archivo PDF</strong>
+              <span class="file-hint">o arrastrá y soltalo acá</span>
+            </div>
+          }
+        </div>
 
         <label class="checkbox">
           <input type="checkbox" [checked]="keepOriginalName()" (change)="onKeepOriginalNameChange($event)" />
@@ -38,14 +73,14 @@ const LIMIT = 10;
           <p class="success">{{ successMessage() }}</p>
         }
 
-        <button type="button" (click)="onSubmit()" [disabled]="submitting() || !canUpload()">
+        <button type="button" class="btn btn-primary" (click)="onSubmit()" [disabled]="submitting() || !canUpload()">
           {{ submitting() ? 'Subiendo…' : 'Subir' }}
         </button>
       </div>
 
       <div class="search">
         <input type="text" placeholder="Buscar en tus documentos…" [value]="searchQuery()" (input)="onSearchQueryChange($event)" (keyup.enter)="onSearch()" />
-        <button type="button" (click)="onSearch()" [disabled]="searching() || !searchQuery().trim()">
+        <button type="button" class="btn btn-primary" (click)="onSearch()" [disabled]="searching() || !searchQuery().trim()">
           {{ searching() ? 'Buscando…' : 'Buscar' }}
         </button>
       </div>
@@ -55,250 +90,299 @@ const LIMIT = 10;
       }
 
       @if (searchResults().length > 0) {
-        <table>
-          <thead>
-            <tr>
-              <th>Documento</th>
-              <th>Página</th>
-              <th>Fragmento</th>
-              <th>Similitud</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (result of searchResults(); track result.chunkId) {
+        <div class="table-wrap">
+          <table>
+            <thead>
               <tr>
-                <td>{{ result.documentName }}</td>
-                <td>{{ result.pageNumber }}</td>
-                <td>{{ result.text }}</td>
-                <td>{{ formatScore(result.score) }}</td>
+                <th>Documento</th>
+                <th>Página</th>
+                <th>Fragmento</th>
+                <th>Similitud</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (result of searchResults(); track result.chunkId) {
+                <tr>
+                  <td>{{ result.documentName }}</td>
+                  <td>{{ result.pageNumber }}</td>
+                  <td>{{ result.text }}</td>
+                  <td>{{ formatScore(result.score) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
 
       @if (error()) {
         <p class="error">{{ error() }}</p>
       }
 
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Tamaño</th>
-            <th>Páginas</th>
-            <th>Estado</th>
-            <th>Subido</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (doc of documents(); track doc.id) {
-            <tr>
-              <td>
-                {{ doc.name }}
-                @if (doc.title || doc.author) {
-                  <p class="meta">
-                    {{ doc.title ?? '—' }}{{ doc.author ? ' · ' + doc.author : '' }}
-                  </p>
-                }
-                @if (doc.status === 'FAILED' && doc.errorMessage) {
-                  <p class="error">{{ doc.errorMessage }}</p>
-                }
-              </td>
-              <td>{{ formatSize(doc.size) }}</td>
-              <td>{{ doc.pageCount ?? '—' }}</td>
-              <td><span class="status" [class]="statusClass(doc.status)">{{ statusLabel(doc.status) }}</span></td>
-              <td>{{ formatDate(doc.createdAt) }}</td>
-              <td class="actions">
-                <a class="view" routerLink="/documents/{{ doc.id }}">Ver páginas</a>
-                <button (click)="download(doc)">Descargar</button>
-                <button class="danger" (click)="remove(doc)">Eliminar</button>
-              </td>
-            </tr>
-          } @empty {
-            <tr>
-              <td colspan="6" class="empty">No hay documentos todavía</td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      @if (documents().length === 0) {
+        <app-empty-state
+          title="Sin documentos"
+          message="Subí tu primer documento para empezar."
+          [actions]="true"
+        >
+          <button type="button" class="btn btn-primary" (click)="openFilePicker()">
+            Subir un documento
+          </button>
+        </app-empty-state>
+      } @else {
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Tamaño</th>
+                <th>Páginas</th>
+                <th>Estado</th>
+                <th>Subido</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (doc of documents(); track doc.id) {
+                <tr>
+                  <td>
+                    <div class="doc-cell">
+                      <span class="doc-name">{{ doc.name }}</span>
+                      @if (doc.title || doc.author) {
+                        <span class="doc-meta">{{ doc.title ?? '—' }}{{ doc.author ? ' · ' + doc.author : '' }}</span>
+                      }
+                    </div>
+                    @if (doc.status === 'FAILED' && doc.errorMessage) {
+                      <p class="error doc-error">{{ doc.errorMessage }}</p>
+                    }
+                  </td>
+                  <td>{{ formatSize(doc.size) }}</td>
+                  <td>{{ doc.pageCount ?? '—' }}</td>
+                  <td><app-status-badge [status]="doc.status" /></td>
+                  <td>{{ formatDate(doc.createdAt) }}</td>
+                  <td class="actions">
+                    <a class="view" routerLink="/documents/{{ doc.id }}">Ver páginas</a>
+                    <button class="btn btn-secondary" (click)="download(doc)">Descargar</button>
+                    <button class="btn btn-danger" (click)="remove(doc)">Eliminar</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
 
-      <div class="pagination">
-        <button (click)="previous()" [disabled]="page() <= 1">Anterior</button>
-        <span>Página {{ page() }} de {{ totalPages() }}</span>
-        <button (click)="next()" [disabled]="page() >= totalPages()">Siguiente</button>
-      </div>
+        <div class="pagination">
+          <button class="btn btn-secondary" (click)="previous()" [disabled]="page() <= 1">Anterior</button>
+          <span>Página {{ page() }} de {{ totalPages() }}</span>
+          <button class="btn btn-secondary" (click)="next()" [disabled]="page() >= totalPages()">Siguiente</button>
+        </div>
+      }
     </section>
   `,
   styles: `
-    .documents .back {
-      display: inline-block;
-      margin-bottom: 1rem;
-      font-size: 0.875rem;
-      color: #1a73e8;
-      text-decoration: none;
+    .documents h1 {
+      margin: 0 0 var(--space-4);
     }
 
     .documents .upload {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-    }
-
-    .documents label {
-      font-size: 0.875rem;
-    }
-
-    .documents input[type='text'] {
-      width: 100%;
-      padding: 0.5rem 0.6rem;
-      margin-top: 0.25rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 1rem;
-    }
-
-    .documents .search {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .documents .search input {
-      flex: 1;
-      padding: 0.5rem 0.6rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 1rem;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
     }
 
     .documents .checkbox {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--space-2);
     }
 
-    .documents button {
-      padding: 0.5rem 0.75rem;
-      border: none;
-      border-radius: 6px;
-      background: #1a73e8;
-      color: #fff;
-      font-size: 0.875rem;
+    .documents .file-picker {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-5);
+      border: 1.5px dashed var(--color-border);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-muted);
       cursor: pointer;
+      transition:
+        border-color var(--motion-fast),
+        background var(--motion-fast);
     }
 
-    .documents button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+    .documents .file-picker:hover,
+    .documents .file-picker.is-dragging {
+      border-color: var(--color-primary);
     }
 
-    .documents button.danger {
-      background: #b00020;
+    .documents .file-picker.is-dragging {
+      background: var(--color-highlight-soft);
+    }
+
+    .documents .file-picker:focus-within {
+      outline: 2px solid var(--color-highlight);
+      outline-offset: 2px;
+    }
+
+    .documents .file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .documents .file-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      color: var(--color-text-muted);
+    }
+
+    .documents .file-placeholder strong {
+      color: var(--color-text);
+      font-weight: var(--weight-medium);
+    }
+
+    .documents .file-icon {
+      width: 2.25rem;
+      height: 2.25rem;
+      color: var(--color-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .documents .file-hint {
+      font-size: var(--text-xs);
+    }
+
+    .documents .file-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      width: 100%;
+    }
+
+    .documents .file-name {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .documents .file-size {
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      white-space: nowrap;
+    }
+
+    .documents .file-clear {
+      margin-left: auto;
+    }
+
+    .documents .search {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .documents .search input {
+      flex: 1;
+    }
+
+    .documents .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-lg);
     }
 
     .documents table {
       width: 100%;
       border-collapse: collapse;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 10px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
       overflow: hidden;
     }
 
     .documents th,
     .documents td {
-      padding: 0.6rem;
+      padding: 0.6rem 0.75rem;
       text-align: left;
-      font-size: 0.875rem;
-      border-bottom: 1px solid #eee;
+      font-size: var(--text-sm);
+      border-bottom: 1px solid var(--color-border);
     }
 
     .documents th {
-      background: #f5f6f8;
-      font-weight: 600;
+      background: var(--color-surface-muted);
+      font-weight: var(--weight-semibold);
+      color: var(--color-text-muted);
+    }
+
+    .documents tbody tr:last-child td {
+      border-bottom: none;
     }
 
     .documents .actions {
       display: flex;
-      gap: 0.5rem;
+      gap: var(--space-2);
       justify-content: flex-end;
       align-items: center;
+      white-space: nowrap;
     }
 
     .documents .actions .view {
-      font-size: 0.875rem;
-      color: #1a73e8;
-      text-decoration: none;
+      color: var(--color-primary);
+      font-size: var(--text-sm);
     }
 
-    .documents .empty {
-      text-align: center;
-      color: #777;
-      padding: 1.5rem;
+    .documents .actions .btn {
+      padding: 0.3rem 0.6rem;
+      font-size: var(--text-xs);
     }
 
     .documents .pagination {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin-top: 1rem;
+      gap: var(--space-4);
+      margin-top: var(--space-4);
     }
 
     .documents .pagination span {
-      font-size: 0.875rem;
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
     }
 
-    .documents .error {
-      color: #b00020;
-      font-size: 0.875rem;
+    .documents .doc-cell {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      max-width: 360px;
+      min-width: 0;
     }
 
-    .documents .meta {
+    .documents .doc-name,
+    .documents .doc-meta {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .documents .doc-meta {
+      color: var(--color-text-muted);
+      font-size: var(--text-xs);
+    }
+
+    .documents .doc-error {
       margin: 0.25rem 0 0;
-      font-size: 0.75rem;
-      color: #777;
-    }
-
-    .documents .status {
-      display: inline-block;
-      padding: 0.15rem 0.5rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      background: #e8eaed;
-      color: #444;
-    }
-
-    .documents .status.completed {
-      background: #e0f2e1;
-      color: #0b6e0b;
-    }
-
-    .documents .status.failed {
-      background: #fdecea;
-      color: #b00020;
-    }
-
-    .documents .status.processing {
-      background: #fff4e5;
-      color: #8a5300;
-    }
-
-    .documents .status.queued {
-      background: #e8f0fe;
-      color: #1a73e8;
-    }
-
-    .documents .success {
-      color: #0b6e0b;
-      font-size: 0.875rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   `,
 })
@@ -323,6 +407,7 @@ export class DocumentsPage implements OnInit, OnDestroy {
   readonly searchError = signal<string | null>(null);
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+  readonly dragging = signal(false);
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / LIMIT)));
 
@@ -367,9 +452,46 @@ export class DocumentsPage implements OnInit, OnDestroy {
 
   onFileChange(event: Event): void {
     const input = event.target as HTMLInputElement;
-    this.selectedFile.set(input.files?.[0] ?? null);
+    this.setFile(input.files?.[0] ?? null);
+  }
+
+  setFile(file: File | null): void {
+    this.selectedFile.set(file);
     this.uploadError.set(null);
     this.successMessage.set(null);
+  }
+
+  clearFile(event: Event): void {
+    event.stopPropagation();
+    this.setFile(null);
+    if (this.fileInput()?.nativeElement) {
+      this.fileInput()!.nativeElement.value = '';
+    }
+  }
+
+  openFilePicker(): void {
+    this.fileInput()?.nativeElement.click();
+  }
+
+  onDragEnter(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(true);
+  }
+
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(false);
+  }
+
+  onDrop(event: DragEvent): void {
+    event.preventDefault();
+    this.dragging.set(false);
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    this.setFile(file);
   }
 
   onKeepOriginalNameChange(event: Event): void {
@@ -478,26 +600,5 @@ export class DocumentsPage implements OnInit, OnDestroy {
 
   formatDate(iso: string): string {
     return new Date(iso).toLocaleString();
-  }
-
-  statusLabel(status: string): string {
-    switch (status) {
-      case 'UPLOADED':
-        return 'Subido';
-      case 'QUEUED':
-        return 'En cola';
-      case 'PROCESSING':
-        return 'Procesando';
-      case 'COMPLETED':
-        return 'Completado';
-      case 'FAILED':
-        return 'Fallido';
-      default:
-        return status;
-    }
-  }
-
-  statusClass(status: string): string {
-    return status.toLowerCase();
   }
 }
