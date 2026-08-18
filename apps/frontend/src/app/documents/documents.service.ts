@@ -24,6 +24,7 @@ export interface Document {
   title: string | null;
   author: string | null;
   errorMessage: string | null;
+  documentType?: string | null;
   job?: DocumentJob | null;
   createdAt: string;
 }

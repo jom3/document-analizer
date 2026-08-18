@@ -152,10 +152,14 @@ import {
       color: var(--color-primary);
       cursor: pointer;
       font-size: var(--text-sm);
+      transition:
+        background var(--motion-fast),
+        color var(--motion-fast);
     }
 
     .sessions .new:hover {
-      background: var(--color-surface-muted);
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
     }
 
     .sessions .session {
@@ -168,6 +172,7 @@ import {
 
     .sessions .session.active {
       background: var(--color-surface-muted);
+      box-shadow: inset 2px 0 0 var(--color-primary);
     }
 
     .sessions .session .title {
@@ -244,6 +249,11 @@ import {
     .message.user .bubble {
       background: var(--color-primary);
       color: var(--color-primary-contrast);
+      border-bottom-right-radius: 4px;
+    }
+
+    .message:not(.user) .bubble {
+      border-bottom-left-radius: 4px;
     }
 
     .sources {
@@ -299,6 +309,17 @@ import {
       color: var(--color-primary-contrast);
       cursor: pointer;
       font-size: var(--text-sm);
+      transition:
+        background var(--motion-fast),
+        transform var(--motion-fast);
+    }
+
+    .composer button:hover:not(:disabled) {
+      background: var(--color-primary-hover);
+    }
+
+    .composer button:active:not(:disabled) {
+      transform: translateY(1px);
     }
 
     .composer button:disabled {

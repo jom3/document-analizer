@@ -89,85 +89,93 @@ const LIMIT = 10;
         <p class="error">{{ searchError() }}</p>
       }
 
-      @if (searchResults().length > 0) {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Documento</th>
-                <th>Página</th>
-                <th>Fragmento</th>
-                <th>Similitud</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (result of searchResults(); track result.chunkId) {
-                <tr>
-                  <td>{{ result.documentName }}</td>
-                  <td>{{ result.pageNumber }}</td>
-                  <td>{{ result.text }}</td>
-                  <td>{{ formatScore(result.score) }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+      @if (searching()) {
+        <div class="search-results">
+          @for (i of [0, 1, 2]; track i) {
+            <div class="skeleton result-skeleton"></div>
+          }
         </div>
+      } @else if (searched()) {
+        @if (searchResults().length > 0) {
+          <section class="search-results">
+            <div class="search-results-head">
+              <h2>Resultados ({{ searchResults().length }})</h2>
+              <button type="button" class="btn btn-ghost" (click)="clearSearch()">Limpiar búsqueda</button>
+            </div>
+            <ol class="result-list">
+              @for (result of searchResults(); track result.chunkId) {
+                <li class="result-item">
+                  <a class="result-link" routerLink="/documents/{{ result.documentId }}">
+                    <span class="result-title">{{ result.documentName }}</span>
+                    <span class="result-meta">Página {{ result.pageNumber }} · {{ formatScore(result.score) }} de similitud</span>
+                    <span class="result-text">{{ result.text }}</span>
+                  </a>
+                </li>
+              }
+            </ol>
+          </section>
+        } @else if (!searchError()) {
+          <section class="search-results">
+            <div class="search-results-head">
+              <h2>Sin resultados</h2>
+              <button type="button" class="btn btn-ghost" (click)="clearSearch()">Limpiar búsqueda</button>
+            </div>
+            <p class="empty">No encontramos documentos que coincidan con tu búsqueda.</p>
+          </section>
+        }
       }
 
       @if (error()) {
         <p class="error">{{ error() }}</p>
       }
 
-      @if (documents().length === 0) {
-        <app-empty-state
-          title="Sin documentos"
-          message="Subí tu primer documento para empezar."
-          [actions]="true"
-        >
-          <button type="button" class="btn btn-primary" (click)="openFilePicker()">
-            Subir un documento
+      @if (!searched()) {
+        @if (documents().length === 0) {
+          <app-empty-state
+            title="Sin documentos"
+            message="Subí tu primer documento para empezar."
+            [actions]="true"
+          >
+            <button type="button" class="btn btn-primary" (click)="openFilePicker()">
+              Subir un documento
           </button>
         </app-empty-state>
       } @else {
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Tamaño</th>
-                <th>Páginas</th>
-                <th>Estado</th>
-                <th>Subido</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (doc of documents(); track doc.id) {
-                <tr>
-                  <td>
-                    <div class="doc-cell">
-                      <span class="doc-name">{{ doc.name }}</span>
-                      @if (doc.title || doc.author) {
-                        <span class="doc-meta">{{ doc.title ?? '—' }}{{ doc.author ? ' · ' + doc.author : '' }}</span>
-                      }
-                    </div>
-                    @if (doc.status === 'FAILED' && doc.errorMessage) {
-                      <p class="error doc-error">{{ doc.errorMessage }}</p>
-                    }
-                  </td>
-                  <td>{{ formatSize(doc.size) }}</td>
-                  <td>{{ doc.pageCount ?? '—' }}</td>
-                  <td><app-status-badge [status]="doc.status" /></td>
-                  <td>{{ formatDate(doc.createdAt) }}</td>
-                  <td class="actions">
-                    <a class="view" routerLink="/documents/{{ doc.id }}">Ver páginas</a>
-                    <button class="btn btn-secondary" (click)="download(doc)">Descargar</button>
-                    <button class="btn btn-danger" (click)="remove(doc)">Eliminar</button>
-                  </td>
-                </tr>
+        <div class="card-grid">
+          @for (doc of documents(); track doc.id) {
+            <article class="card doc-card lift">
+              <div class="doc-card-top">
+                <span class="doc-type" [class]="'type-' + typeClass(doc.documentType)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M7 3h7l4 4v14H7z" stroke-linejoin="round" />
+                    <path d="M14 3v4h4" stroke-linejoin="round" />
+                    <path d="M10 12h5M10 16h5" stroke-linecap="round" />
+                  </svg>
+                </span>
+                <app-status-badge [status]="doc.status" />
+              </div>
+
+              <h3 class="doc-card-name">{{ doc.name }}</h3>
+              @if (doc.title || doc.author) {
+                <p class="doc-card-meta">{{ doc.title ?? '—' }}{{ doc.author ? ' · ' + doc.author : '' }}</p>
               }
-            </tbody>
-          </table>
+              @if (doc.status === 'FAILED' && doc.errorMessage) {
+                <p class="error doc-error">{{ doc.errorMessage }}</p>
+              }
+
+              <div class="doc-card-metrics">
+                <span>{{ formatSize(doc.size) }}</span>
+                <span>{{ doc.pageCount ?? '—' }} págs.</span>
+                <span>{{ formatDate(doc.createdAt) }}</span>
+              </div>
+
+              <div class="doc-card-actions">
+                <a class="view" routerLink="/documents/{{ doc.id }}">Ver páginas</a>
+                <button class="btn btn-secondary" (click)="download(doc)">Descargar</button>
+                <button class="btn btn-danger" (click)="remove(doc)">Eliminar</button>
+              </div>
+            </article>
+          }
         </div>
 
         <div class="pagination">
@@ -175,6 +183,7 @@ const LIMIT = 10;
           <span>Página {{ page() }} de {{ totalPages() }}</span>
           <button class="btn btn-secondary" (click)="next()" [disabled]="page() >= totalPages()">Siguiente</button>
         </div>
+      }
       }
     </section>
   `,
@@ -295,56 +304,6 @@ const LIMIT = 10;
       flex: 1;
     }
 
-    .documents .table-wrap {
-      overflow-x: auto;
-      border-radius: var(--radius-lg);
-    }
-
-    .documents table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--color-surface);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-    }
-
-    .documents th,
-    .documents td {
-      padding: 0.6rem 0.75rem;
-      text-align: left;
-      font-size: var(--text-sm);
-      border-bottom: 1px solid var(--color-border);
-    }
-
-    .documents th {
-      background: var(--color-surface-muted);
-      font-weight: var(--weight-semibold);
-      color: var(--color-text-muted);
-    }
-
-    .documents tbody tr:last-child td {
-      border-bottom: none;
-    }
-
-    .documents .actions {
-      display: flex;
-      gap: var(--space-2);
-      justify-content: flex-end;
-      align-items: center;
-      white-space: nowrap;
-    }
-
-    .documents .actions .view {
-      color: var(--color-primary);
-      font-size: var(--text-sm);
-    }
-
-    .documents .actions .btn {
-      padding: 0.3rem 0.6rem;
-      font-size: var(--text-xs);
-    }
-
     .documents .pagination {
       display: flex;
       align-items: center;
@@ -357,32 +316,84 @@ const LIMIT = 10;
       color: var(--color-text-muted);
     }
 
-    .documents .doc-cell {
+    .documents .search-results {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .documents .search-results-head {
       display: flex;
       align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+
+    .documents .search-results-head h2 {
+      margin: 0;
+      font-size: var(--text-base);
+    }
+
+    .documents .result-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
       gap: var(--space-2);
-      max-width: 360px;
-      min-width: 0;
     }
 
-    .documents .doc-name,
-    .documents .doc-meta {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .documents .result-item {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      transition:
+        border-color var(--motion-fast),
+        transform var(--motion-base),
+        box-shadow var(--motion-base);
     }
 
-    .documents .doc-meta {
-      color: var(--color-text-muted);
+    .documents .result-item:hover {
+      border-color: var(--color-primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .documents .result-link {
+      display: block;
+      padding: var(--space-4);
+      color: var(--color-text);
+    }
+
+    .documents .result-title {
+      display: block;
+      font-weight: var(--weight-semibold);
+      color: var(--color-primary);
+    }
+
+    .documents .result-meta {
+      display: block;
+      margin-top: var(--space-1);
+      font-family: var(--font-mono);
       font-size: var(--text-xs);
+      color: var(--color-text-muted);
     }
 
-    .documents .doc-error {
-      margin: 0.25rem 0 0;
+    .documents .result-text {
+      display: block;
+      margin-top: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--color-text-muted);
+      line-height: var(--leading-base);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    }
+
+    .documents .result-skeleton {
+      min-height: 90px;
     }
   `,
 })
@@ -405,6 +416,7 @@ export class DocumentsPage implements OnInit, OnDestroy {
   readonly searchResults = signal<SearchResultItem[]>([]);
   readonly searching = signal(false);
   readonly searchError = signal<string | null>(null);
+  readonly searched = signal(false);
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
   readonly dragging = signal(false);
@@ -512,6 +524,7 @@ export class DocumentsPage implements OnInit, OnDestroy {
 
     this.searching.set(true);
     this.searchError.set(null);
+    this.searched.set(true);
     this.documentsService.search(query).subscribe({
       next: (results) => {
         this.searching.set(false);
@@ -524,8 +537,30 @@ export class DocumentsPage implements OnInit, OnDestroy {
     });
   }
 
+  clearSearch(): void {
+    this.searchResults.set([]);
+    this.searchQuery.set('');
+    this.searchError.set(null);
+    this.searched.set(false);
+  }
+
   formatScore(score: number): string {
     return `${(score * 100).toFixed(1)}%`;
+  }
+
+  typeClass(documentType: string | null | undefined): string {
+    switch (documentType) {
+      case 'invoice':
+        return 'invoice';
+      case 'resume':
+        return 'resume';
+      case 'contract':
+        return 'contract';
+      case 'generic':
+        return 'generic';
+      default:
+        return 'unclassified';
+    }
   }
 
   onSubmit(): void {
