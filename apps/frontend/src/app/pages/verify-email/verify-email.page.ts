@@ -1,29 +1,36 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { AuthLayoutComponent } from '../../components/auth-layout/auth-layout.component';
 import { AuthService } from '../../auth/auth.service';
 
 @Component({
   selector: 'app-verify-email-page',
-  imports: [RouterLink],
+  imports: [RouterLink, AuthLayoutComponent],
   template: `
-    <section class="auth-card">
-      <h1>Document Analyzer</h1>
-      <h2>Verificación de email</h2>
+    <app-auth-layout
+      heading="Verificá tu email"
+      text="Confirmá tu cuenta para empezar a analizar documentos."
+      [panelVariant]="'compact'"
+    >
+      <h1>Verificación de email</h1>
+      <p class="auth-sub">Confirmá tu cuenta para empezar a analizar documentos.</p>
 
-      @switch (state()) {
-        @case ('verifying') {
-          <p>Verificando tu cuenta...</p>
+      <section class="auth-form-card">
+        @switch (state()) {
+          @case ('verifying') {
+            <p>Verificando tu cuenta...</p>
+          }
+          @case ('success') {
+            <p class="info">Tu email fue verificado. Ya podés iniciar sesión.</p>
+            <a routerLink="/login">Ir a iniciar sesión</a>
+          }
+          @case ('error') {
+            <p class="error">{{ error() }}</p>
+            <a routerLink="/register">Volver a registrarte</a>
+          }
         }
-        @case ('success') {
-          <p class="info">Tu email fue verificado. Ya podés iniciar sesión.</p>
-          <a routerLink="/login">Ir a iniciar sesión</a>
-        }
-        @case ('error') {
-          <p class="error">{{ error() }}</p>
-          <a routerLink="/register">Volver a registrarte</a>
-        }
-      }
-    </section>
+      </section>
+    </app-auth-layout>
   `,
 })
 export class VerifyEmailPage implements OnInit {

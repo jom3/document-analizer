@@ -87,11 +87,15 @@ interface PdfTextItem {
     .toolbar-btn {
       padding: 0.25rem 0.75rem;
       border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-full);
       background: var(--color-surface);
       color: var(--color-text);
       cursor: pointer;
       font-size: var(--text-sm);
+      transition:
+        background var(--motion-fast),
+        border-color var(--motion-fast),
+        transform var(--motion-fast);
     }
 
     .toolbar-btn:disabled {
@@ -101,6 +105,11 @@ interface PdfTextItem {
 
     .toolbar-btn:hover:not(:disabled) {
       background: var(--color-surface-muted);
+      border-color: var(--color-text-muted);
+    }
+
+    .toolbar-btn:active:not(:disabled) {
+      transform: translateY(1px);
     }
 
     .page-indicator {

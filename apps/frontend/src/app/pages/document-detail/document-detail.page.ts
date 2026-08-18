@@ -26,8 +26,19 @@ import {
         />
       } @else if (document()) {
         <header class="detail-header">
-          <h1>{{ document()!.name }}</h1>
-          <app-status-badge [status]="document()!.status" />
+          <div class="detail-title">
+            <p class="detail-eyebrow">Documento</p>
+            <h1>{{ document()!.name }}</h1>
+          </div>
+          <div class="detail-header-actions">
+            <app-status-badge [status]="document()!.status" />
+            <button type="button" class="btn btn-secondary" (click)="download()">
+              Descargar
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M12 4v12m0 0l-4-4m4 4l4-4M5 20h14" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
         </header>
 
         <div class="detail-layout">
@@ -110,7 +121,7 @@ import {
                 } @else {
                   <p class="analysis-summary">{{ analysis()!.summary }}</p>
                   <p class="meta">
-                    <span class="type">{{ typeLabel(analysis()!.documentType) }}</span>
+                    <span class="type-pill" [class]="'type-' + typeClass(analysis()!.documentType)">{{ typeLabel(analysis()!.documentType) }}</span>
                     · Confidencia: {{ analysis()!.confidence }}%
                     ({{ confidenceLabel(analysis()!.confidence) }})
                     @if (analysis()!.truncated) {
@@ -158,13 +169,37 @@ import {
   styles: `
     .detail-header {
       display: flex;
-      align-items: center;
-      gap: var(--space-3);
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--space-4);
       margin-bottom: var(--space-5);
     }
 
-    .detail-header h1 {
+    .detail-title h1 {
       margin: 0;
+      font-size: var(--text-3xl);
+      word-break: break-word;
+    }
+
+    .detail-eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-primary);
+    }
+
+    .detail-header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-shrink: 0;
+    }
+
+    .detail-header-actions .btn svg {
+      width: 1rem;
+      height: 1rem;
     }
 
     .muted {
@@ -185,17 +220,29 @@ import {
 
     .view-tabs {
       display: flex;
-      gap: var(--space-2);
+      gap: 0.25rem;
+      padding: 0.25rem;
       margin-bottom: var(--space-3);
+      background: var(--color-surface-muted);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-full);
+      width: fit-content;
     }
 
     .view-tabs .btn {
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
       border-radius: var(--radius-full);
+    }
+
+    .view-tabs .btn:hover:not(.active) {
+      background: var(--color-surface);
+      color: var(--color-text);
     }
 
     .view-tabs .btn.active {
       background: var(--color-primary);
-      border-color: var(--color-primary);
       color: var(--color-primary-contrast);
     }
 
@@ -258,14 +305,34 @@ import {
       line-height: var(--leading-base);
     }
 
-    .type {
+    .type-pill {
       display: inline-block;
       padding: 0.15rem 0.5rem;
       border-radius: var(--radius-full);
       font-size: var(--text-xs);
       font-weight: var(--weight-semibold);
+      background: var(--color-surface-muted);
+      color: var(--color-text-muted);
+    }
+
+    .type-pill.type-invoice {
+      background: var(--color-status-completed-bg);
+      color: var(--color-status-completed-fg);
+    }
+
+    .type-pill.type-resume {
       background: var(--color-status-queued-bg);
       color: var(--color-status-queued-fg);
+    }
+
+    .type-pill.type-contract {
+      background: var(--color-status-processing-bg);
+      color: var(--color-status-processing-fg);
+    }
+
+    .type-pill.type-generic {
+      background: var(--color-surface-muted);
+      color: var(--color-text-muted);
     }
 
     .meta {
@@ -453,6 +520,21 @@ export class DocumentDetailPage implements OnInit {
         return 'Documento genérico';
       default:
         return type ?? 'Desconocido';
+    }
+  }
+
+  typeClass(type: string | null | undefined): string {
+    switch (type) {
+      case 'invoice':
+        return 'invoice';
+      case 'resume':
+        return 'resume';
+      case 'contract':
+        return 'contract';
+      case 'generic':
+        return 'generic';
+      default:
+        return 'unclassified';
     }
   }
 

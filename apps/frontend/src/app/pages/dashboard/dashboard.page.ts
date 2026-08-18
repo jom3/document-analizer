@@ -1,5 +1,6 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../../auth/auth.service';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { DocumentStats, DocumentsService } from '../../documents/documents.service';
@@ -10,7 +11,11 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
   template: `
     <section class="dashboard">
       <header class="dashboard-header">
-        <h1>Dashboard</h1>
+        <div>
+          <p class="dashboard-eyebrow">Panel de control</p>
+          <h1>{{ greeting() }}</h1>
+          <p class="dashboard-sub">Resumen de tu actividad documental.</p>
+        </div>
         <button type="button" class="btn btn-primary" (click)="load()" [disabled]="loading()">
           Actualizar
         </button>
@@ -19,10 +24,10 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
       @if (loading()) {
         <div class="kpi-grid">
           @for (i of [0, 1, 2, 3]; track i) {
-            <div class="card skeleton"></div>
+            <div class="skeleton kpi-skeleton"></div>
           }
         </div>
-        <div class="card skeleton skeleton-tall"></div>
+        <div class="skeleton skeleton-tall"></div>
       } @else if (error()) {
         <app-empty-state
           title="No se pudo cargar el dashboard"
@@ -42,25 +47,49 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
         </app-empty-state>
       } @else {
         <div class="kpi-grid">
-          <div class="card kpi">
-            <span class="kpi-label">Total</span>
+          <div class="kpi-card lift">
+            <span class="kpi-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="M8 8h8M8 12h8M8 16h5" stroke-linecap="round" />
+              </svg>
+            </span>
             <span class="kpi-value">{{ stats()!.total }}</span>
+            <span class="kpi-label">Total</span>
           </div>
-          <div class="card kpi">
-            <span class="kpi-label">Procesados</span>
+          <div class="kpi-card kpi-success lift">
+            <span class="kpi-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M8.5 12.5l2.5 2.5 5-5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
             <span class="kpi-value">{{ stats()!.processed }}</span>
+            <span class="kpi-label">Procesados</span>
           </div>
-          <div class="card kpi">
-            <span class="kpi-label">En curso</span>
+          <div class="kpi-card kpi-warning lift">
+            <span class="kpi-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
             <span class="kpi-value">{{ stats()!.processing }}</span>
+            <span class="kpi-label">En curso</span>
           </div>
-          <div class="card kpi">
-            <span class="kpi-label">Fallidos</span>
+          <div class="kpi-card kpi-danger lift">
+            <span class="kpi-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M12 4l9 16H3z" stroke-linejoin="round" />
+                <path d="M12 10v4M12 17v.5" stroke-linecap="round" />
+              </svg>
+            </span>
             <span class="kpi-value">{{ stats()!.failed }}</span>
+            <span class="kpi-label">Fallidos</span>
           </div>
         </div>
 
-        <section class="card">
+        <section class="card lift">
           <h2>Documentos recientes</h2>
           @for (doc of stats()!.recent; track doc.id) {
             <a class="recent-row" routerLink="/documents/{{ doc.id }}">
@@ -74,7 +103,7 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
         </section>
 
         <div class="stats-grid">
-          <section class="card">
+          <section class="card lift">
             <h2>Distribución por estado</h2>
             <div class="bar-list">
               <div class="bar-row">
@@ -101,7 +130,7 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
             </div>
           </section>
 
-          <section class="card">
+          <section class="card lift">
             <h2>Actividad semanal</h2>
             <div class="activity-chart">
               @for (week of stats()!.activity; track week.weekStart) {
@@ -117,7 +146,7 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
           </section>
         </div>
 
-        <section class="card">
+        <section class="card lift">
           <h2>Desglose por tipo</h2>
           <div class="bar-list">
             @for (type of stats()!.byType; track type.type) {
@@ -143,14 +172,30 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
 
     .dashboard-header {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
       gap: var(--space-4);
-      margin-bottom: var(--space-5);
+      margin-bottom: var(--space-6);
     }
 
     .dashboard-header h1 {
       margin: 0;
+      font-size: var(--text-3xl);
+    }
+
+    .dashboard-eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-primary);
+    }
+
+    .dashboard-sub {
+      margin: var(--space-1) 0 0;
+      color: var(--color-text-muted);
+      font-size: var(--text-sm);
     }
 
     .dashboard .card {
@@ -164,64 +209,12 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
       margin-bottom: var(--space-4);
     }
 
-    .kpi-grid .card {
-      margin-bottom: 0;
-    }
-
-    .kpi {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-    }
-
-    .kpi-label {
-      font-size: var(--text-xs);
-      color: var(--color-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .kpi-value {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xl);
-      font-weight: var(--weight-semibold);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-4);
-      margin-bottom: var(--space-4);
-    }
-
-    .stats-grid .card {
-      margin-bottom: 0;
-    }
-
-    .skeleton {
-      min-height: 90px;
-      border: 1px solid var(--color-border);
-      background: linear-gradient(
-        90deg,
-        var(--color-surface-muted) 25%,
-        var(--color-surface) 50%,
-        var(--color-surface-muted) 75%
-      );
-      background-size: 200% 100%;
-      animation: shimmer 1.4s infinite;
+    .kpi-skeleton {
+      min-height: 132px;
     }
 
     .skeleton-tall {
       min-height: 180px;
-    }
-
-    @keyframes shimmer {
-      from {
-        background-position: 200% 0;
-      }
-      to {
-        background-position: -200% 0;
-      }
     }
 
     .recent-row {
@@ -255,6 +248,17 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
       color: var(--color-text-muted);
     }
 
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .stats-grid .card {
+      margin-bottom: 0;
+    }
+
     .bar-list {
       display: flex;
       flex-direction: column;
@@ -274,7 +278,7 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
     }
 
     .bar-track {
-      height: 0.6rem;
+      height: 0.7rem;
       background: var(--color-surface-muted);
       border-radius: var(--radius-full);
       overflow: hidden;
@@ -282,12 +286,12 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
 
     .bar-fill {
       height: 100%;
-      background: var(--color-primary);
       border-radius: var(--radius-full);
+      background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
     }
 
     .bar-fill.success {
-      background: var(--color-success);
+      background: linear-gradient(90deg, var(--color-success), var(--color-primary));
     }
 
     .bar-fill.warning {
@@ -329,9 +333,9 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
     .activity-bar {
       width: 70%;
       max-width: 2.5rem;
-      background: var(--color-primary);
-      border-radius: 4px 4px 0 0;
       min-height: 2px;
+      border-radius: 4px 4px 0 0;
+      background: linear-gradient(to top, var(--color-primary-hover), var(--color-primary));
     }
 
     .activity-value {
@@ -366,10 +370,16 @@ import { DocumentStats, DocumentsService } from '../../documents/documents.servi
 })
 export class DashboardPage implements OnInit {
   private readonly documents = inject(DocumentsService);
+  private readonly auth = inject(AuthService);
 
   readonly stats = signal<DocumentStats | null>(null);
   readonly loading = signal(true);
   readonly error = signal(false);
+
+  readonly greeting = computed(() => {
+    const email = this.auth.user()?.email;
+    return email ? `Hola, ${email.split('@')[0]}` : 'Hola';
+  });
 
   ngOnInit(): void {
     this.load();

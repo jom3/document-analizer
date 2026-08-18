@@ -161,6 +161,7 @@ export class DocumentsService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
+        include: { analysis: { select: { documentType: true } } },
       }),
       this.prisma.document.count({ where }),
     ]);
