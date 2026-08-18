@@ -272,7 +272,7 @@ The main objective is to demonstrate **how AI can become part of a real software
 
 ## Development Setup
 
-The application is not containerized (Dockerization is a future feature/spec). Only PostgreSQL runs in a **standalone container**, independent of the project, so you can start and stop it without affecting the code.
+For local development only PostgreSQL and Redis run in **standalone containers**, independent of the project, so you can start and stop them without affecting the code. The backend and frontend run natively with `npm run dev`. To run the **whole stack in Docker** (production/portfolio mode), see [Deployment (Docker)](#deployment-docker) below.
 
 ### Local database (PostgreSQL container)
 
@@ -306,6 +306,66 @@ The backend connects to it through `DATABASE_URL` (see `apps/backend/.env.exampl
 ```text
 DATABASE_URL="postgresql://postgres:postgres@localhost:5433/document_analyzer?schema=public"
 ```
+
+---
+
+## Deployment (Docker)
+
+The whole stack (PostgreSQL, Redis, backend and frontend) can run in Docker with a single command. The frontend is served as a static build by nginx, which also proxies `/api` to the backend.
+
+### 1. Prepare the environment file
+
+Copy the template and fill in the real secrets:
+
+```bash
+cp .env.example .env
+```
+
+Required values: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OPENAI_API_KEY`. `RESEND_API_KEY` is only needed for password recovery and email verification emails.
+
+> Set `NODE_ENV=production` only when deploying behind HTTPS/TLS: it enables `Secure` cookies on the backend. Leave it unset for local testing over `http://localhost:4200`.
+
+### 2. Build and start the stack
+
+```bash
+docker compose up -d --build
+```
+
+This builds the multi-stage images (backend on Node 24, frontend on nginx) and starts all services. The first build downloads dependencies and may take a few minutes.
+
+### 3. Check the status
+
+```bash
+docker compose ps
+```
+
+All services should show `healthy`:
+
+```text
+NAME                         STATUS
+document-analyzer-db         Up (healthy)
+document-analyzer-redis      Up (healthy)
+document-analyzer-backend    Up (healthy)
+document-analyzer-frontend   Up (healthy)
+```
+
+- Frontend: http://localhost:4200
+- Backend API: http://localhost:3000
+- Health check: http://localhost:3000/health
+
+### 4. Stop the stack
+
+```bash
+docker compose down
+```
+
+Data is preserved in the named volumes (`document-analyzer-db-data`, `document-analyzer-redis-data`, `document-analyzer-storage`). Use `docker compose down -v` only if you also want to delete all data.
+
+### Notes
+
+- The development flow (`npm run dev` + `proxy.conf.json` + PostgreSQL/Redis containers) is unchanged; Docker mode is an additional way to run the application.
+- Ports are the same as development: `3000` (backend), `4200` (frontend), `5433` (PostgreSQL), `6379` (Redis).
+- Uploaded documents persist in the `document-analyzer-storage` volume.
 
 ---
 
